@@ -262,8 +262,30 @@ npm run build
 - Archivos con hash para cache busting
 
 ### Hosting Recomendado
+
+#### Vercel (Recomendado)
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel --prod
+```
+
+**Configuración para SPA**: El proyecto incluye `vercel.json` para manejar el routing de React Router:
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+#### Otras Opciones
 - **Netlify**: Deploy automático desde Git
-- **Vercel**: Optimizado para React
 - **GitHub Pages**: Hosting gratuito
 - **Firebase Hosting**: Integración con otros servicios
 
