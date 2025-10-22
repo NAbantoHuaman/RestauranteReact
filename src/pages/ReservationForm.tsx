@@ -66,6 +66,50 @@ export default function ReservationForm() {
     setReservationData(prev => ({ ...prev, ...data }));
   };
 
+  const canProceed = () => {
+    switch (STEPS[currentStep].id) {
+      case 'personas':
+        return reservationData.adults > 0;
+      case 'fecha':
+        return reservationData.date !== '';
+      case 'hora':
+        return reservationData.time !== '';
+      case 'zona':
+        return reservationData.zone !== '' && reservationData.table !== '' && reservationData.consumptionType !== '';
+      case 'datos':
+        return reservationData.customerName !== '' && 
+               reservationData.customerEmail !== '' && 
+               reservationData.customerPhone !== '' &&
+               reservationData.acceptTerms;
+      default:
+        return false;
+    }
+  };
+
+  const getValidationMessage = () => {
+    switch (STEPS[currentStep].id) {
+      case 'personas':
+        return reservationData.adults === 0 ? 'Debe seleccionar al menos 1 adulto' : '';
+      case 'fecha':
+        return reservationData.date === '' ? 'Debe seleccionar una fecha' : '';
+      case 'hora':
+        return reservationData.time === '' ? 'Debe seleccionar una hora' : '';
+      case 'zona':
+        if (reservationData.zone === '') return 'Debe seleccionar una zona';
+        if (reservationData.table === '') return 'Debe seleccionar una mesa';
+        if (reservationData.consumptionType === '') return 'Debe seleccionar un tipo de consumo';
+        return '';
+      case 'datos':
+        if (reservationData.customerName === '') return 'Debe ingresar su nombre';
+        if (reservationData.customerEmail === '') return 'Debe ingresar su email';
+        if (reservationData.customerPhone === '') return 'Debe ingresar su teléfono';
+        if (!reservationData.acceptTerms) return 'Debe aceptar los términos y condiciones';
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleComplete = async () => {
     // Validar que todos los campos requeridos estén completos
     if (!reservationData.date || !reservationData.time || !reservationData.zone || 
@@ -168,7 +212,7 @@ export default function ReservationForm() {
         </div>
 
         {/* Navigation Buttons */}
-        <div className="max-w-6xl mx-auto flex justify-between">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <button
             onClick={prevStep}
             disabled={currentStep === 0 || isSubmitting}
@@ -180,13 +224,22 @@ export default function ReservationForm() {
           >
             Anterior
           </button>
+
+          {/* Validation Message */}
+          <div className="flex-1 text-center">
+            {!canProceed() && (
+              <p className="text-red-600 text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-2 inline-block">
+                {getValidationMessage()}
+              </p>
+            )}
+          </div>
           
           {currentStep === STEPS.length - 1 ? (
             <button
               onClick={handleComplete}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canProceed()}
               className={`px-8 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
-                isSubmitting
+                isSubmitting || !canProceed()
                   ? 'bg-neutral-400 text-white cursor-not-allowed'
                   : 'bg-amber-600 text-white hover:bg-amber-700'
               }`}
@@ -203,9 +256,9 @@ export default function ReservationForm() {
           ) : (
             <button
               onClick={nextStep}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canProceed()}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                isSubmitting
+                isSubmitting || !canProceed()
                   ? 'bg-neutral-400 text-white cursor-not-allowed'
                   : 'bg-amber-600 text-white hover:bg-amber-700'
               }`}

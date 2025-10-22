@@ -90,6 +90,30 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
     }
   };
 
+  const getValidationMessage = () => {
+    switch (currentStep) {
+      case 1:
+        return reservationData.adults === 0 ? 'Debe seleccionar al menos 1 adulto' : '';
+      case 2:
+        return reservationData.date === '' ? 'Debe seleccionar una fecha' : '';
+      case 3:
+        return reservationData.time === '' ? 'Debe seleccionar una hora' : '';
+      case 4:
+        if (reservationData.zone === '') return 'Debe seleccionar una zona';
+        if (reservationData.table === '') return 'Debe seleccionar una mesa';
+        if (reservationData.consumptionType === '') return 'Debe seleccionar un tipo de consumo';
+        return '';
+      case 5:
+        if (reservationData.customerName === '') return 'Debe ingresar su nombre';
+        if (reservationData.customerEmail === '') return 'Debe ingresar su email';
+        if (reservationData.customerPhone === '') return 'Debe ingresar su teléfono';
+        if (!reservationData.acceptTerms) return 'Debe aceptar los términos y condiciones';
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleComplete = () => {
     if (canProceed()) {
       // Usar el hook para agregar la reserva
@@ -199,6 +223,15 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
             <ChevronLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Anterior</span>
           </button>
+
+          {/* Validation Message */}
+          <div className="flex-1 text-center px-4">
+            {!canProceed() && (
+              <p className="text-red-600 text-xs sm:text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-2 sm:px-4 py-2 inline-block">
+                {getValidationMessage()}
+              </p>
+            )}
+          </div>
 
           <div className="text-xs sm:text-sm text-neutral-500">
             Paso {currentStep} de {STEPS.length}
