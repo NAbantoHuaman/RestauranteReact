@@ -109,46 +109,93 @@ const menuItems: MenuItem[] = [
     category: 'bebidas',
     image: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80'
   },
+  {
+    id: 13,
+    name: 'Paella Mixta',
+    description: 'Arroz con mariscos y carnes, azafrán y pimientos asados',
+    price: 78,
+    category: 'principales',
+    image: 'https://www.rieglpalate.com/wp-content/uploads/2024/04/Paella-Mixta-1024x683.jpg'
+  },
+  {
+    id: 14,
+    name: 'Pollo a la Brasa',
+    description: 'Clásico peruano con papas y ensalada, salsa huancaína',
+    price: 55,
+    category: 'principales',
+    image: 'https://elcomercio.pe/resizer/v2/55QLUH7SV5E53AFZHMYNTJ4TTE.jpg?auth=bdffd2a0f4da7a109fb83ad9b94fcf63e5ca1c345be580dc898152c14dac10a0&width=1200&height=675&quality=75&smart=true'
+  },
+  {
+    id: 15,
+    name: 'Pasta Alfredo con Camarones',
+    description: 'Fettuccine cremoso con mantequilla, parmesano y camarones',
+    price: 66,
+    category: 'principales',
+    image: 'https://www.cocinadelirante.com/800x600/filters:format(webp):quality(75)/sites/default/files/images/2023/05/pasta-alfredo-con-camarones-y-pesto.jpg'
+  },
+  {
+    id: 16,
+    name: 'Chicha Morada',
+    description: 'Refresco tradicional de maíz morado con fruta y especias',
+    price: 16,
+    category: 'bebidas',
+    image: 'https://origin.cronosmedia.glr.pe/large/2023/07/24/lg_64bebe2ae1753238157f7157.jpg'
+  },
+  {
+    id: 17,
+    name: 'Limonada de Hierbabuena',
+    description: 'Limonada fresca con hoja de menta y hielo',
+    price: 14,
+    category: 'bebidas',
+    image: 'https://www.apega.pe/wp-content/uploads/2025/08/receta-de-limonada-con-hierbabuena-800x445.jpg.webp'
+  },
+  {
+    id: 18,
+    name: 'Gin Tonic Clásico',
+    description: 'Gin premium con tónica, limón y enebro',
+    price: 28,
+    category: 'bebidas',
+    image: 'https://www.paulinacocina.net/wp-content/uploads/2022/05/gin-tonic-receta.jpg.webp'
+  },
+  {
+    id: 19,
+    name: 'Suspiro a la Limeña',
+    description: 'Manjar blanco y merengue, un clásico dulce peruano',
+    price: 26,
+    category: 'postres',
+    image: 'https://www.gourmet.cl/wp-content/uploads/2016/09/Suspiro-Limeno-ajustada-web-570x458.jpg'
+  },
+  {
+    id: 20,
+    name: 'Tres Leches',
+    description: 'Bizcocho húmedo con mezcla de tres leches y canela',
+    price: 24,
+    category: 'postres',
+    image: 'https://www.lemonblossoms.com/wp-content/uploads/2023/03/Tres-Leches-Cake-S2.jpg'
+  },
+  {
+    id: 21,
+    name: 'Helado Artesanal',
+    description: 'Selección de sabores artesanales con frutas de estación',
+    price: 22,
+    category: 'postres',
+    image: 'https://mejisa.com/wp-content/uploads/2019/04/helado-artesanal.jpg'
+  },
 ];
 
 export default function Menu() {
   const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<Category>('all');
 
-  // Definir filteredItems antes del useEffect
   const filteredItems =
     selectedCategory === 'all'
       ? menuItems
       : menuItems.filter((item) => item.category === selectedCategory);
 
-  // Scroll reveal animations
-  useEffect(() => {
-    const observerOptions = {
-      threshold: [0, 0.1, 0.5, 1],
-      rootMargin: '-50px 0px -50px 0px'
-    };
+  
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('revealed');
-        } else {
-          entry.target.classList.remove('revealed');
-        }
-      });
-    }, observerOptions);
-
-    const scrollElements = document.querySelectorAll('.scroll-reveal, .scroll-reveal-left, .scroll-reveal-right, .scroll-reveal-up, .scroll-reveal-zoom');
-    scrollElements.forEach((el) => observer.observe(el));
-    
-    return () => {
-      observer.disconnect();
-    };
-  }, [selectedCategory]);
-
-  // Mapeo de IDs de platos a claves de traducción
   const getItemTranslationKey = (itemId: number): string => {
-    const keyMap: { [key: number]: string } = {
+    const keyMap: Record<number, string> = {
       1: 'carpaccio',
       2: 'ceviche', 
       3: 'caesar',
@@ -160,7 +207,16 @@ export default function Menu() {
       9: 'volcano',
       10: 'cheesecake',
       11: 'wine',
-      12: 'pisco'
+      12: 'pisco',
+      13: 'paella',
+      14: 'pollo_brasa',
+      15: 'pasta_alfredo',
+      16: 'chicha',
+      17: 'limonada',
+      18: 'gin_tonic',
+      19: 'suspiro',
+      20: 'tres_leches',
+      21: 'helado_artesanal'
     };
     return keyMap[itemId] || 'unknown';
   };
@@ -219,6 +275,8 @@ export default function Menu() {
     }
   };
 
+  
+
   const categories = [
     { id: 'all' as Category, label: 'Todo' },
     { id: 'entradas' as Category, label: 'Entradas' },
@@ -230,8 +288,7 @@ export default function Menu() {
   return (
     <div className="min-h-screen py-6 sm:py-12 pt-20 bg-gradient-to-br from-amber-50 via-orange-50/30 to-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Hero Section */}
-        <div className="text-center mb-6 sm:mb-12 scroll-reveal-zoom">
+        <div className="text-center mb-6 sm:mb-12">
           <div className="inline-block mb-2 sm:mb-4">
             <div className="w-16 sm:w-20 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full mx-auto mb-2 sm:mb-4"></div>
           </div>
@@ -243,8 +300,7 @@ export default function Menu() {
           </p>
         </div>
 
-        {/* Categories Filter */}
-        <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-8 mb-6 sm:mb-12 border border-neutral-100 scroll-reveal-up reveal-delay-1">
+        <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-8 mb-6 sm:mb-12 border border-neutral-100">
           <div className="flex items-center mb-3 sm:mb-6">
             <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mr-2 sm:mr-4 shadow-lg">
               <svg className="h-4 w-4 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,9 +309,9 @@ export default function Menu() {
             </div>
             <div>
               <h3 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-neutral-900 via-amber-800 to-neutral-900 bg-clip-text text-transparent">
-                Categorías
+                {t('menu.categoriesTitle')}
               </h3>
-              <p className="text-xs sm:text-base text-neutral-600">Explora nuestras deliciosas opciones por categoría</p>
+              <p className="text-xs sm:text-base text-neutral-600">{t('menu.categoriesSubtitle')}</p>
             </div>
           </div>
           
@@ -282,87 +338,66 @@ export default function Menu() {
           </div>
         </div>
 
-        {/* Menu Items Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
           {filteredItems.map((item, index) => {
-            // Determinar el tipo de animación basado en el índice
-            const getAnimationClass = (index: number) => {
-              const animations = ['scroll-reveal-left', 'scroll-reveal-up', 'scroll-reveal-right', 'scroll-reveal-zoom'];
-              return animations[index % animations.length];
-            };
-
-            const getDelayClass = (index: number) => {
-              const delays = ['reveal-delay-1', 'reveal-delay-2', 'reveal-delay-3', 'reveal-delay-4', 'reveal-delay-5', 'reveal-delay-6'];
-              return delays[index % delays.length];
-            };
+            
 
             return (
               <div
                 key={item.id}
-                className={`group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden border border-neutral-100 hover:border-amber-200 transform hover:-translate-y-2 ${getAnimationClass(index)} ${getDelayClass(index)}`}
+                className={`group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden border border-neutral-100 hover:border-amber-200 transform hover:-translate-y-2`}
               >
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/30 to-orange-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              
-              {/* Image Section */}
-              <div className="relative h-32 sm:h-64 overflow-hidden">
-                <img 
-                  src={item.image} 
-                  alt={t(`menu.items.${getItemTranslationKey(item.id)}.name`)}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-50/30 to-orange-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 
-                {/* Price Badge */}
-                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-1 sm:px-4 sm:py-2 rounded-2xl font-bold shadow-lg transform transition-all duration-300 group-hover:scale-110">
-                  <span className="text-xs sm:text-sm">S/</span>
-                  <span className="text-sm sm:text-lg ml-1">{item.price}</span>
+                <div className="relative h-32 sm:h-64 overflow-hidden">
+                  <img 
+                    src={item.image} 
+                    alt={t(`menu.items.${getItemTranslationKey(item.id)}.name`)}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                  
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-1 sm:px-4 sm:py-2 rounded-2xl font-bold shadow-lg transform transition-all duration-300 group-hover:scale-110">
+                    <span className="text-xs sm:text-sm">S/</span>
+                    <span className="text-sm sm:text-lg ml-1">{item.price}</span>
+                  </div>
+                  
+                  <div className={`absolute top-2 left-2 sm:top-4 sm:left-4 bg-gradient-to-r ${getCategoryColor(item.category)} text-white px-2 py-1 sm:px-3 sm:py-2 rounded-2xl text-xs sm:text-sm font-semibold shadow-lg flex items-center`}>
+                    <span className="mr-1 sm:mr-2">
+                      {getCategoryIcon(item.category)}
+                    </span>
+                    <span className="hidden sm:inline">{t(`menu.categories.${item.category}`)}</span>
+                  </div>
                 </div>
                 
-                {/* Category Badge */}
-                <div className={`absolute top-2 left-2 sm:top-4 sm:left-4 bg-gradient-to-r ${getCategoryColor(item.category)} text-white px-2 py-1 sm:px-3 sm:py-2 rounded-2xl text-xs sm:text-sm font-semibold shadow-lg flex items-center`}>
-                  <span className="mr-1 sm:mr-2">
-                    {getCategoryIcon(item.category)}
-                  </span>
-                  <span className="hidden sm:inline">{t(`menu.categories.${item.category}`)}</span>
-                </div>
-              </div>
-              
-              {/* Content Section */}
-              <div className="relative z-10 p-3 sm:p-6">
-                <h3 className="text-sm sm:text-2xl font-bold text-neutral-900 group-hover:text-amber-800 transition-colors duration-300 mb-1 sm:mb-3">
-                  {t(`menu.items.${getItemTranslationKey(item.id)}.name`)}
-                </h3>
-                
-                <p className="text-neutral-600 leading-relaxed mb-2 sm:mb-6 text-xs sm:text-sm">
-                  {t(`menu.items.${getItemTranslationKey(item.id)}.description`)}
-                </p>
-                
-                {/* Action Section */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1 sm:space-x-2">
-                    <div className="w-2 h-2 sm:w-3 sm:h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full"></div>
-                    <span className="text-xs sm:text-sm font-medium text-green-700">Disponible</span>
+                <div className="relative z-10 p-3 sm:p-6">
+                  <h3 className="text-sm sm:text-2xl font-bold text-neutral-900 group-hover:text-amber-800 transition-colors duration-300 mb-1 sm:mb-3">
+                    {t(`menu.items.${getItemTranslationKey(item.id)}.name`)}
+                  </h3>
+                  <p className="text-xs sm:text-base text-neutral-600 group-hover:text-neutral-700 transition-colors duration-300 mb-2 sm:mb-4 line-clamp-2">
+                    {t(`menu.items.${getItemTranslationKey(item.id)}.description`)}
+                  </p>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="flex text-amber-400 mr-2">
+                        {[...Array(5)].map((_, i) => (
+                          <svg key={i} className="w-3 h-3 sm:w-4 sm:h-4 fill-current" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-xs sm:text-sm text-neutral-500">(4.8)</span>
+                    </div>
+                    
+
                   </div>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
-
-        {/* Empty State */}
-        {filteredItems.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gradient-to-br from-neutral-100 to-neutral-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-              <svg className="w-12 h-12 text-neutral-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-neutral-700 mb-2">No hay platos disponibles</h3>
-            <p className="text-neutral-500">No se encontraron platos en esta categoría.</p>
-          </div>
-        )}
       </div>
     </div>
   );

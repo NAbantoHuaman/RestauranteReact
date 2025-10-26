@@ -1,19 +1,9 @@
-// Configuración centralizada del restaurante para evitar duplicaciones
-
 export interface Zone {
   id: string;
   name: string;
   description: string;
-  icon: string;
-  tables: Table[];
-}
-
-export interface Table {
-  id: string;
-  name: string;
   capacity: number;
-  type: string;
-  realId: number | string;
+  tables: number[];
 }
 
 export interface ConsumptionType {
@@ -23,66 +13,83 @@ export interface ConsumptionType {
   icon: string;
 }
 
-// Configuración de zonas del restaurante
-export const RESTAURANT_ZONES: Zone[] = [
-  {
-    id: 'terraza',
-    name: 'Terraza',
-    description: 'Ambiente al aire libre con vista panorámica',
-    icon: '🌿',
-    tables: [
-      { id: 'T1', name: 'Mesa T1', capacity: 4, type: 'Cuadrada', realId: 5 },
-      { id: 'T2', name: 'Mesa T2', capacity: 2, type: 'Redonda', realId: 6 }
-    ]
-  },
-  {
-    id: 'interior',
-    name: 'Salón Interior',
-    description: 'Ambiente climatizado y acogedor',
-    icon: '🏠',
-    tables: [
-      { id: 'I1', name: 'Mesa I1', capacity: 2, type: 'Redonda', realId: 1 },
-      { id: 'I2', name: 'Mesa I2', capacity: 4, type: 'Cuadrada', realId: 2 }
-    ]
-  },
-  {
-    id: 'patio',
-    name: 'Patio',
-    description: 'Espacio semi-abierto con ambiente natural',
-    icon: '🌳',
-    tables: [
-      { id: 'PT1', name: 'Mesa PT1', capacity: 4, type: 'Cuadrada', realId: 3 },
-      { id: 'PT2', name: 'Mesa PT2', capacity: 6, type: 'Rectangular', realId: 4 }
-    ]
-  },
-  {
-    id: 'privado',
-    name: 'Salón Privado',
-    description: 'Espacio exclusivo para eventos especiales',
-    icon: '👑',
-    tables: [
-      { id: 'P1', name: 'Mesa P1', capacity: 10, type: 'Ovalada', realId: 9 },
-      { id: 'P2', name: 'Mesa P2', capacity: 12, type: 'Rectangular', realId: 10 }
-    ]
+export interface RestaurantConfig {
+  zones: Zone[];
+  consumptionTypes: ConsumptionType[];
+  maxGuestsPerReservation: number;
+  reservationTimeSlots: string[];
+  businessHours: {
+    lunch: { start: string; end: string };
+    dinner: { start: string; end: string };
+  };
+}
+
+export const restaurantConfig: RestaurantConfig = {
+  zones: [
+    {
+      id: 'terraza',
+      name: 'Terraza',
+      description: 'Área al aire libre con vista panorámica',
+      capacity: 40,
+      tables: [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    {
+      id: 'interior',
+      name: 'Interior',
+      description: 'Ambiente acogedor con aire acondicionado',
+      capacity: 60,
+      tables: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    },
+    {
+      id: 'privado',
+      name: 'Salón Privado',
+      description: 'Espacio exclusivo para eventos especiales',
+      capacity: 20,
+      tables: [21, 22, 23, 24]
+    },
+    {
+      id: 'barra',
+      name: 'Barra',
+      description: 'Área de barra para comidas rápidas',
+      capacity: 16,
+      tables: [25, 26, 27, 28, 29, 30, 31, 32]
+    }
+  ],
+  consumptionTypes: [
+    {
+      id: 'almuerzo',
+      name: 'Almuerzo',
+      description: 'Comida del mediodía',
+      icon: '🍽️'
+    },
+    {
+      id: 'cena',
+      name: 'Cena',
+      description: 'Comida de la noche',
+      icon: '🌙'
+    }
+  ],
+  maxGuestsPerReservation: 8,
+  reservationTimeSlots: [
+    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+    '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'
+  ],
+  businessHours: {
+    lunch: { start: '12:00', end: '15:00' },
+    dinner: { start: '19:00', end: '23:00' }
   }
-];
-
-// Configuración de tipos de consumo
-export const CONSUMPTION_TYPES: ConsumptionType[] = [
-  { id: 'almuerzo', name: 'Almuerzo', description: 'Menú del día y carta completa', icon: '🍽️' },
-  { id: 'cena', name: 'Cena', description: 'Carta completa y menú degustación', icon: '🌙' },
-  { id: 'bebidas', name: 'Solo Bebidas', description: 'Cócteles, vinos y aperitivos', icon: '🍷' },
-  { id: 'evento', name: 'Evento Especial', description: 'Celebraciones y ocasiones especiales', icon: '🎉' }
-];
-
-// Función helper para obtener el nombre de una zona
-export const getZoneName = (zoneId: string): string => {
-  const zone = RESTAURANT_ZONES.find(z => z.id === zoneId);
-  return zone?.name || 'Zona desconocida';
 };
 
-// Función helper para obtener el nombre de un tipo de consumo
+// Export individual constants for backward compatibility
+export const RESTAURANT_ZONES = restaurantConfig.zones;
+export const CONSUMPTION_TYPES = restaurantConfig.consumptionTypes;
+
+export const getZoneName = (zoneId: string): string => {
+  const zone = restaurantConfig.zones.find(z => z.id === zoneId);
+  return zone ? zone.name : zoneId;
+};
+
 export const getConsumptionTypeName = (typeId: string): string => {
-  const type = CONSUMPTION_TYPES.find(t => t.id === typeId);
-  return type?.name || 'Tipo desconocido';
+  const type = restaurantConfig.consumptionTypes.find(t => t.id === typeId);
+  return type ? type.name : typeId;
 };

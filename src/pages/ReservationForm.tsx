@@ -3,6 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, MapPin, Phone, Mail, User, Plus, Minus, Check, ChevronLeft, ChevronRight, Info, CheckCircle } from 'lucide-react';
 import { useTablesManager } from '../hooks/useTablesManager';
 import { RESTAURANT_ZONES, CONSUMPTION_TYPES, getZoneName, getConsumptionTypeName } from '../config/restaurantConfig';
+import { useLanguage } from '../contexts/LanguageContext';
+import { formatTimeLabel } from '../utils/dateTime';
+
+// import { createReservationICS, downloadICS } from '../utils/ics';
+import { createReservationReceiptHTML, downloadReceipt } from '../utils/receipt';
 
 interface ReservationData {
   adults: number;
@@ -20,20 +25,17 @@ interface ReservationData {
   acceptTerms: boolean;
 }
 
-const STEPS = [
-  { id: 'personas', title: 'Personas', description: 'Número de comensales' },
-  { id: 'fecha', title: 'Fecha', description: 'Día de la reserva' },
-  { id: 'hora', title: 'Hora', description: 'Horario preferido' },
-  { id: 'zona', title: 'Zona', description: 'Mesa y ambiente' },
-  { id: 'datos', title: 'Datos', description: 'Información personal' }
-];
+// Eliminado STEPS estático: se usa LOCALIZED_STEPS dentro del componente
 
 export default function ReservationForm() {
   const navigate = useNavigate();
-  const { addReservation } = useTablesManager();
+  const { addReservation, tables, getTableIdFromWizardId } = useTablesManager();
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-PE';
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  
   const [reservationData, setReservationData] = useState<ReservationData>({
     adults: 2,
     children: 0,
@@ -50,8 +52,34 @@ export default function ReservationForm() {
     acceptTerms: false
   });
 
+  // Localizar títulos de pasos con i18n
+  const LOCALIZED_STEPS = [
+    { id: 'personas', title: t('reservations.choosePeopleTitle') },
+    { id: 'fecha', title: t('reservations.selectDateTitle') },
+    { id: 'hora', title: t('reservations.selectTimeTitle') },
+    { id: 'zona', title: t('reservations.chooseZoneTypeTitle') },
+    { id: 'datos', title: t('reservations.yourDetailsTitle') }
+  ];
+
+  // Subtítulos localizados por paso
+  const getStepSubtitle = (id: string) => {
+    switch (id) {
+      case 'personas':
+        return t('reservations.childrenNote');
+      case 'fecha':
+        return t('reservations.selectDateSubtitle');
+      case 'hora':
+        return t('reservations.selectTimeSubtitle');
+      case 'zona':
+        return t('reservations.chooseZoneTypeSubtitle');
+      case 'datos':
+        return t('reservations.yourDetailsSubtitle');
+      default:
+        return '';
+    }
+  };
   const nextStep = () => {
-    if (currentStep < STEPS.length - 1) {
+    if (currentStep < LOCALIZED_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -66,8 +94,69 @@ export default function ReservationForm() {
     setReservationData(prev => ({ ...prev, ...data }));
   };
 
+  const handleDownloadICS = () => { /* deprecated: usando boleta HTML */ };
+  const handleDownloadReceipt = () => {
+    const language = localStorage.getItem("language") || "es";
+    const labels = {
+      title: language === "en" ? "Reservation Receipt" : "Boleta de Reserva",
+      date: language === "en" ? "Date" : "Fecha",
+      time: language === "en" ? "Time" : "Hora",
+      customer: language === "en" ? "Customer" : "Cliente",
+      guests: language === "en" ? "Guests" : "Comensales",
+      table: language === "en" ? "Table" : "Mesa",
+      zone: language === "en" ? "Zone" : "Zona",
+      consumption: language === "en" ? "Consumption" : "Consumo",
+      phone: language === "en" ? "Phone" : "Teléfono",
+      email: language === "en" ? "Email" : "Correo",
+      notes: language === "en" ? "Notes" : "Notas",
+      location: language === "en" ? "Location" : "Ubicación",
+      qr: language === "en" ? "QR Code" : "Código QR",
+    };
+
+    const dateStr = date;
+    const timeStr = time;
+    const tableLabel = `${labels.table} ${tableLabelFromSelection ?? ""}`;
+    const zoneLabel = zoneName ?? undefined;
+    const consumptionTypeLabel = consumptionType ?? undefined;
+    const location = `${t('footer.restaurantName')}, ${t('home.info.address.value')}`;
+
+    const qrPayloadObj = {
+      type: "reservation",
+      date: dateStr,
+      time: timeStr,
+      customer: customerName,
+      guests,
+      table: tableLabelFromSelection ?? "",
+      zone: zoneName ?? "",
+    };
+
+    const payloadBase64 = btoa(JSON.stringify(qrPayloadObj));
+    const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+    const qrUrl = `${baseUrl}/reservation-view?data=${encodeURIComponent(payloadBase64)}`;
+
+    const html = createReservationReceiptHTML(
+      {
+        date: dateStr,
+        time: timeStr,
+        customerName,
+        guests,
+        tableLabel,
+        zoneLabel,
+        consumptionTypeLabel,
+        phone,
+        email,
+        specialRequests: specialRequests ?? "",
+        location,
+        qrUrl,
+      },
+      labels
+    );
+
+    const fileName = `${labels.title.replace(/\s+/g, "_")}_${dateStr}_${timeStr}_${tableLabelFromSelection ?? ""}.html`;
+    downloadReceipt(fileName, html);
+  };
   const canProceed = () => {
-    switch (STEPS[currentStep].id) {
+    switch (LOCALIZED_STEPS[currentStep].id) {
       case 'personas':
         return reservationData.adults > 0;
       case 'fecha':
@@ -87,65 +176,65 @@ export default function ReservationForm() {
   };
 
   const getValidationMessage = () => {
-    switch (STEPS[currentStep].id) {
+    switch (LOCALIZED_STEPS[currentStep].id) {
       case 'personas':
-        return reservationData.adults === 0 ? 'Debe seleccionar al menos 1 adulto' : '';
+        return reservationData.adults === 0 ? t('reservations.errors.mustSelectAdults') : '';
       case 'fecha':
-        return reservationData.date === '' ? 'Debe seleccionar una fecha' : '';
+        return reservationData.date === '' ? t('reservations.errors.mustSelectDate') : '';
       case 'hora':
-        return reservationData.time === '' ? 'Debe seleccionar una hora' : '';
+        return reservationData.time === '' ? t('reservations.errors.mustSelectTime') : '';
       case 'zona':
-        if (reservationData.zone === '') return 'Debe seleccionar una zona';
-        if (reservationData.table === '') return 'Debe seleccionar una mesa';
-        if (reservationData.consumptionType === '') return 'Debe seleccionar un tipo de consumo';
+        if (reservationData.zone === '') return t('reservations.errors.mustSelectZone');
+        if (reservationData.table === '') return t('reservations.errors.mustSelectTable');
+        if (reservationData.consumptionType === '') return t('reservations.errors.mustSelectConsumptionType');
         return '';
       case 'datos':
-        if (reservationData.customerName === '') return 'Debe ingresar su nombre';
-        if (reservationData.customerEmail === '') return 'Debe ingresar su email';
-        if (reservationData.customerPhone === '') return 'Debe ingresar su teléfono';
-        if (!reservationData.acceptTerms) return 'Debe aceptar los términos y condiciones';
+        if (reservationData.customerName === '') return t('reservations.errors.customerNameRequired');
+        if (reservationData.customerEmail === '') return t('reservations.errors.customerEmailRequired');
+        if (reservationData.customerPhone === '') return t('reservations.errors.customerPhoneRequired');
+        if (!reservationData.acceptTerms) return t('reservations.errors.acceptTermsRequired');
         return '';
       default:
         return '';
     }
   };
 
-  const handleComplete = async () => {
-    // Validar que todos los campos requeridos estén completos
-    if (!reservationData.date || !reservationData.time || !reservationData.zone || 
-        !reservationData.table || !reservationData.customerName || 
-        !reservationData.customerEmail || !reservationData.customerPhone || 
-        !reservationData.acceptTerms) {
-      alert('Por favor completa todos los campos requeridos');
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      // Intentar crear la reserva
-      const success = addReservation(reservationData);
-      
-      if (success) {
-        setShowSuccess(true);
+  const handleComplete = () => {
+    if (canProceed()) {
+      if (reservationData.date && reservationData.time && reservationData.zone && 
+          reservationData.table && reservationData.customerName && 
+          reservationData.customerEmail && reservationData.customerPhone && 
+          reservationData.acceptTerms) {
         
-        // Mostrar notificación de éxito por 2 segundos y luego redirigir
-        setTimeout(() => {
-          navigate('/reservations');
-        }, 2000);
-      } else {
-        alert('Error al crear la reserva. Por favor intenta nuevamente.');
-        setIsSubmitting(false);
+        setIsSubmitting(true);
+        
+        try {
+          const guests = (reservationData.adults || 0) + (reservationData.children || 0) + (reservationData.babies || 0);
+          const ok = addReservation({
+            ...reservationData,
+            guests,
+          });
+          
+          if (!ok) {
+            setIsSubmitting(false);
+            return;
+          }
+          
+          setShowSuccess(true);
+          setTimeout(() => {
+            setShowSuccess(false);
+            navigate('/reservations');
+          }, 8000);
+        } catch (error) {
+          console.error('Error al crear la reserva:', error);
+          setIsSubmitting(false);
+        }
       }
-    } catch (error) {
-      console.error('Error al crear reserva:', error);
-      alert('Error al crear la reserva. Por favor intenta nuevamente.');
-      setIsSubmitting(false);
     }
   };
 
   const renderStepContent = () => {
-    switch (STEPS[currentStep].id) {
+    switch (LOCALIZED_STEPS[currentStep].id) {
       case 'personas':
         return <StepPersonas data={reservationData} onUpdate={updateReservationData} />;
       case 'fecha':
@@ -170,33 +259,24 @@ export default function ReservationForm() {
             to="/reservations" 
             className="inline-flex items-center text-amber-600 hover:text-amber-700 mb-4"
           >
-            ← Volver a Reservas
+            ← {t('nav.reservations')}
           </Link>
-          <h1 className="text-4xl font-bold text-neutral-900 mb-2">Nueva Reserva</h1>
-          <p className="text-neutral-600">Completa los siguientes pasos para realizar tu reserva</p>
+          <h1 className="text-4xl font-bold text-neutral-900 mb-2">{t('reservations.newReservation')}</h1>
+          <p className="text-neutral-600">{t('reservations.selectDateSubtitle')}</p>
         </div>
 
         {/* Progress Bar */}
         <div className="max-w-4xl mx-auto mb-8">
           <div className="flex items-center justify-between">
-            {STEPS.map((step, index) => (
+            {LOCALIZED_STEPS.map((step, index) => (
               <div key={step.id} className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  index <= currentStep 
-                    ? 'bg-amber-600 border-amber-600 text-white' 
-                    : 'bg-white border-neutral-300 text-neutral-400'
-                }`}>
-                  {index + 1}
+                <div className="text-sm font-medium text-neutral-900">
+                  {step.title}
                 </div>
-                <div className="ml-3 hidden sm:block">
-                  <p className={`text-sm font-medium ${
-                    index <= currentStep ? 'text-amber-600' : 'text-neutral-400'
-                  }`}>
-                    {step.title}
-                  </p>
-                  <p className="text-xs text-neutral-500">{step.description}</p>
+                <div className="text-xs text-neutral-500 ml-2">
+                  {getStepSubtitle(step.id)}
                 </div>
-                {index < STEPS.length - 1 && (
+                {index < LOCALIZED_STEPS.length - 1 && (
                   <div className={`w-12 h-0.5 mx-4 ${
                     index < currentStep ? 'bg-amber-600' : 'bg-neutral-300'
                   }`} />
@@ -222,7 +302,7 @@ export default function ReservationForm() {
                 : 'bg-neutral-600 text-white hover:bg-neutral-700'
             }`}
           >
-            Anterior
+            {t('reservations.prev')}
           </button>
 
           {/* Validation Message */}
@@ -234,7 +314,7 @@ export default function ReservationForm() {
             )}
           </div>
           
-          {currentStep === STEPS.length - 1 ? (
+          {currentStep === LOCALIZED_STEPS.length - 1 ? (
             <button
               onClick={handleComplete}
               disabled={isSubmitting || !canProceed()}
@@ -247,10 +327,10 @@ export default function ReservationForm() {
               {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Procesando...</span>
+                  <span>{t('reservations.processing')}</span>
                 </>
               ) : (
-                <span>Confirmar Reserva</span>
+                <span>{t('reservations.form.createReservation')}</span>
               )}
             </button>
           ) : (
@@ -259,11 +339,11 @@ export default function ReservationForm() {
               disabled={isSubmitting || !canProceed()}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                 isSubmitting || !canProceed()
-                  ? 'bg-neutral-400 text-white cursor-not-allowed'
+                  ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                   : 'bg-amber-600 text-white hover:bg-amber-700'
               }`}
             >
-              Siguiente
+              {t('reservations.next')}
             </button>
           )}
         </div>
@@ -275,21 +355,44 @@ export default function ReservationForm() {
               <div className="mb-4">
                 <CheckCircle className="h-16 w-16 text-green-600 mx-auto" />
               </div>
-              <h3 className="text-2xl font-bold text-neutral-900 mb-2">¡Reserva Confirmada!</h3>
+              <h3 className="text-2xl font-bold text-neutral-900 mb-2">{t('reservations.successModal.title')}</h3>
               <p className="text-neutral-600 mb-4">
-                Tu reserva ha sido creada exitosamente. Recibirás un email de confirmación en breve.
+                {t('reservations.successModal.message')}
               </p>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
-                <h4 className="font-semibold text-green-900 mb-2">Detalles de tu reserva:</h4>
+                <h4 className="font-semibold text-green-900 mb-2">{t('reservations.successModal.detailsTitle')}</h4>
                 <div className="text-sm text-green-800 space-y-1">
-                  <p><span className="font-medium">Fecha:</span> {reservationData.date}</p>
-                  <p><span className="font-medium">Hora:</span> {reservationData.time}</p>
-                  <p><span className="font-medium">Personas:</span> {reservationData.adults + reservationData.children + reservationData.babies}</p>
-                  <p><span className="font-medium">Mesa:</span> {reservationData.table}</p>
+                  <p><span className="font-medium">{t('reservations.date')}:</span>{' '}
+                    {reservationData.date
+                      ? new Date(reservationData.date).toLocaleDateString(locale, {
+                          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                        })
+                      : t('reservations.notSelected')}
+                  </p>
+                  <p><span className="font-medium">{t('reservations.time')}:</span>{' '}
+                    {reservationData.time
+                      ? formatTimeLabel(language, reservationData.time)
+                      : t('reservations.notSelected')}
+                  </p>
+                  <p><span className="font-medium">{t('reservations.people')}:</span> {reservationData.adults + reservationData.children + reservationData.babies}</p>
+                  <p><span className="font-medium">{t('reservations.table')}:</span>{' '}
+                    {(() => {
+                      const realId = getTableIdFromWizardId(String(reservationData.table));
+                      const selTable = realId ? tables.find(t => t.id === realId) : undefined;
+                      return selTable ? `${selTable.number}` : reservationData.table;
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex items-center justify-center">
+                  <button onClick={handleDownloadReceipt} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    {language === 'en' ? 'Download receipt' : 'Descargar boleta'}
+                  </button>
                 </div>
               </div>
               <p className="text-xs text-neutral-500 mt-4">
-                Redirigiendo a la página de reservas...
+                {t('reservations.successModal.redirecting')}
               </p>
             </div>
           </div>
@@ -301,13 +404,11 @@ export default function ReservationForm() {
 
 // Step Components
 function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
+  const { t } = useLanguage();
   const updateGuests = (type: 'adults' | 'children' | 'babies', increment: boolean) => {
     const currentValue = data[type] || 0;
     const newValue = increment ? currentValue + 1 : Math.max(0, currentValue - 1);
-    
-    // Asegurar que siempre haya al menos 1 adulto
     if (type === 'adults' && newValue < 1) return;
-    
     onUpdate({ [type]: newValue });
   };
 
@@ -364,14 +465,14 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">¿Cuántas personas?</h3>
-        <p className="text-neutral-600">Selecciona el número de comensales para tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.choosePeopleTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.childrenNote')}</p>
       </div>
 
       <div className="space-y-4 mb-8">
         <PersonCounter
-          title="Adultos"
-          description="13 años en adelante"
+          title={t('reservations.adults')}
+          description={t('reservations.adultsSubtitle')}
           icon="👤"
           count={data.adults || 1}
           onIncrement={() => updateGuests('adults', true)}
@@ -380,8 +481,8 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
         />
         
         <PersonCounter
-          title="Niños"
-          description="3-12 años"
+          title={t('reservations.children')}
+          description={t('reservations.childrenSubtitle')}
           icon="👶"
           count={data.children || 0}
           onIncrement={() => updateGuests('children', true)}
@@ -389,8 +490,8 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
         />
         
         <PersonCounter
-          title="Bebés"
-          description="0-2 años"
+          title={t('reservations.babies')}
+          description={t('reservations.babiesSubtitle')}
           icon="🍼"
           count={data.babies || 0}
           onIncrement={() => updateGuests('babies', true)}
@@ -401,11 +502,11 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
       {/* Resumen */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
         <p className="text-amber-800">
-          <span className="font-semibold">Total: {totalGuests} persona{totalGuests !== 1 ? 's' : ''}</span>
+          <span className="font-semibold">{t('reservations.totalPeople', {count: totalGuests})}</span>
         </p>
         {totalGuests > 8 && (
           <p className="text-sm text-amber-700 mt-2">
-            Para grupos de más de 8 personas, te recomendamos contactar directamente al restaurante
+            {t('reservations.contactLargeGroups')}
           </p>
         )}
       </div>
@@ -414,7 +515,8 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
 }
 
 function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
-  // Generar fechas disponibles (próximos 30 días)
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-PE';
   const generateAvailableDates = () => {
     const dates = [];
     const today = new Date();
@@ -435,7 +537,7 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   };
 
   const formatDisplayDate = (date: Date) => {
-    return date.toLocaleDateString('es-ES', {
+    return date.toLocaleDateString(locale, {
       weekday: 'short',
       day: 'numeric',
       month: 'short'
@@ -454,16 +556,16 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   };
 
   const getDateLabel = (date: Date) => {
-    if (isToday(date)) return 'Hoy';
-    if (isTomorrow(date)) return 'Mañana';
+    if (isToday(date)) return t('reservations.today');
+    if (isTomorrow(date)) return t('reservations.tomorrow');
     return formatDisplayDate(date);
   };
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Elige la fecha</h3>
-        <p className="text-neutral-600">Selecciona el día para tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.selectDateTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.selectDateSubtitle')}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
@@ -494,7 +596,7 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
               <div className={`text-xs ${
                 isSelected ? 'text-amber-600' : 'text-neutral-500'
               }`}>
-                {date.toLocaleDateString('es-ES', { month: 'short' })}
+                {date.toLocaleDateString(locale, { month: 'short' })}
               </div>
             </button>
           );
@@ -505,8 +607,8 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       {data.date && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
           <p className="text-amber-800">
-            <span className="font-semibold">Fecha seleccionada: </span>
-            {new Date(data.date).toLocaleDateString('es-ES', {
+            <span className="font-semibold">{t('reservations.selectedDate')}: </span>
+            {new Date(data.date).toLocaleDateString(locale, {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
@@ -520,6 +622,7 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 }
 
 function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
+  const { t, language } = useLanguage();
   const { tables, isTableAvailableForDateTime } = useTablesManager();
   
   const timeSlots = {
@@ -533,11 +636,8 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
 
   // Verificar disponibilidad real basada en reservas existentes
   const isTimeAvailable = (time: string) => {
-    // Si no hay fecha seleccionada, mostrar todos los horarios como disponibles
     if (!data.date) return true;
     
-    // Verificar si hay alguna mesa disponible para esta fecha y hora
-    // Si al menos una mesa está disponible, el horario está disponible
     const availableTablesForTime = tables.filter(table => 
       isTableAvailableForDateTime(table.id, data.date!, time)
     );
@@ -563,10 +663,10 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
         <div className={`font-semibold ${
           !available ? 'text-neutral-400' : isSelected ? 'text-amber-900' : 'text-neutral-900'
         }`}>
-          {time}
+          {formatTimeLabel(language, time)}
         </div>
         {!available && (
-          <div className="text-xs text-red-500 mt-1">Ocupado</div>
+          <div className="text-xs text-red-500 mt-1">{t('reservations.form.notAvailable')}</div>
         )}
       </button>
     );
@@ -575,8 +675,8 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Selecciona la hora</h3>
-        <p className="text-neutral-600">Elige el horario que prefieras para tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.selectTimeTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.selectTimeSubtitle')}</p>
       </div>
 
       <div className="space-y-8">
@@ -584,7 +684,7 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
         <div>
           <h4 className="text-xl font-semibold text-neutral-900 mb-4 flex items-center">
             <span className="text-2xl mr-2">🍽️</span>
-            Almuerzo
+            {t('reservations.lunch')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {timeSlots.lunch.map((time) => (
@@ -601,7 +701,7 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
         <div>
           <h4 className="text-xl font-semibold text-neutral-900 mb-4 flex items-center">
             <span className="text-2xl mr-2">🌙</span>
-            Cena
+            {t('reservations.dinner')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {timeSlots.dinner.map((time) => (
@@ -619,8 +719,8 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
       {data.time && (
         <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
           <p className="text-amber-800">
-            <span className="font-semibold">Hora seleccionada: </span>
-            {data.time}
+            <span className="font-semibold">{t('reservations.selectedTime')}: </span>
+            {formatTimeLabel(language, data.time)}
           </p>
         </div>
       )}
@@ -629,43 +729,29 @@ function StepHora({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
 }
 
 function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
-  const { isTableAvailableForDateTime } = useTablesManager();
+  const { tables, getAvailableTablesForZone, isTableAvailableForDateTime, getWizardIdFromTableId, getTableIdFromWizardId } = useTablesManager();
+  const { t } = useLanguage();
 
   const totalGuests = (data.adults || 1) + (data.children || 0) + (data.babies || 0);
-  const selectedZone = RESTAURANT_ZONES.find(zone => zone.id === data.zone);
-  
-  // Obtener mesas disponibles usando el hook real
-  const availableTables = selectedZone?.tables.filter(table => {
-    // Verificar capacidad
-    if (table.capacity < totalGuests) return false;
-    
-    // Verificar disponibilidad real si tenemos fecha y hora
-    if (data.date && data.time && table.realId) {
-      return isTableAvailableForDateTime(table.realId as number, data.date, data.time);
-    }
-    
-    return true;
-  }) || [];
 
-  // Función para verificar disponibilidad de mesa específica
-  const getTableAvailability = (table: any) => {
-    if (!data.date || !data.time || !table.realId) {
-      return true; // Si no hay fecha/hora seleccionada, mostrar como disponible
-    }
-    return isTableAvailableForDateTime(table.realId, data.date, data.time);
-  };
+  const availableTables = getAvailableTablesForZone(
+    data.zone || '',
+    totalGuests,
+    data.date || '',
+    data.time || ''
+  );
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Elige zona y tipo de consumo</h3>
-        <p className="text-neutral-600">Selecciona el ambiente y el tipo de experiencia que prefieres</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.chooseZoneTypeTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.chooseZoneTypeSubtitle')}</p>
       </div>
 
       <div className="space-y-8">
         {/* Selección de Zona */}
         <div>
-          <h4 className="text-xl font-semibold text-neutral-900 mb-4">Zona del restaurante</h4>
+          <h4 className="text-xl font-semibold text-neutral-900 mb-4">{t('reservations.restaurantZone')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {RESTAURANT_ZONES.map((zone) => (
               <button
@@ -677,21 +763,21 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
                     : 'border-neutral-200 bg-white hover:border-amber-300 hover:shadow-md'
                 }`}
               >
-                <div className="text-3xl mb-3">{zone.icon}</div>
+                <div className="text-3xl mb-3">{(zone as any).icon}</div>
                 <h5 className={`text-lg font-bold mb-2 ${
                   data.zone === zone.id ? 'text-amber-900' : 'text-neutral-900'
                 }`}>
-                  {zone.name}
+                  {t(`reservations.zones.${zone.id}.name`)}
                 </h5>
                 <p className={`text-sm ${
                   data.zone === zone.id ? 'text-amber-700' : 'text-neutral-600'
                 }`}>
-                  {zone.description}
+                  {t(`reservations.zones.${zone.id}.description`)}
                 </p>
                 <div className={`text-xs mt-2 ${
                   data.zone === zone.id ? 'text-amber-600' : 'text-neutral-500'
                 }`}>
-                  {zone.tables.length} mesas disponibles
+                  {getAvailableTablesForZone(zone.id, totalGuests, data.date || '', data.time || '').length} {t('reservations.tablesAvailable')}
                 </div>
               </button>
             ))}
@@ -702,17 +788,20 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
         {data.zone && (
           <div>
             <h4 className="text-xl font-semibold text-neutral-900 mb-4">
-              Mesas disponibles en {selectedZone?.name}
+              {t('reservations.availableTablesIn')} {t(`reservations.zones.${data.zone}.name`)}
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {availableTables.map((table) => {
-                const isAvailable = getTableAvailability(table);
-                const isSelected = data.table === table.id;
-                
+                const wizardId = getWizardIdFromTableId(table.id) || String(table.id);
+                const isAvailable = data.date && data.time
+                  ? isTableAvailableForDateTime(table.id, data.date, data.time)
+                  : table.status === 'available';
+                const isSelected = data.table === wizardId;
+
                 return (
                   <button
                     key={table.id}
-                    onClick={() => isAvailable && onUpdate({ table: table.id })}
+                    onClick={() => isAvailable && onUpdate({ table: wizardId })}
                     disabled={!isAvailable}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       !isAvailable
@@ -726,20 +815,20 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
                       <div className={`font-bold mb-1 ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-900' : 'text-neutral-900'
                       }`}>
-                        {table.name}
-                      </div>
+                          {t('reservations.table')} {table.number}
+                        </div>
                       <div className={`text-xs mb-1 ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-700' : 'text-neutral-600'
                       }`}>
-                        {table.type}
+                        {t(`reservations.zones.${table.location}.name`)}
                       </div>
                       <div className={`text-xs ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-600' : 'text-neutral-500'
                       }`}>
-                        Hasta {table.capacity} personas
-                      </div>
+                        {t('reservations.capacityUpTo', {count: table.capacity})}
+                        </div>
                       {!isAvailable && (
-                        <div className="text-xs text-red-500 mt-1">Ocupada</div>
+                        <div className="text-xs text-red-500 mt-1">{t('reservations.occupied')}</div>
                       )}
                     </div>
                   </button>
@@ -748,9 +837,9 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
             </div>
             {availableTables.length === 0 && (
               <div className="text-center py-8 text-neutral-500">
-                No hay mesas disponibles para {totalGuests} personas en esta zona.
+                {t('reservations.noTablesAvailableZone', {count: totalGuests})}
                 <br />
-                Por favor, selecciona otra zona.
+                {t('reservations.selectAnotherZone')}
               </div>
             )}
           </div>
@@ -758,7 +847,7 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
 
         {/* Tipo de Consumo */}
         <div>
-          <h4 className="text-xl font-semibold text-neutral-900 mb-4">Tipo de consumo</h4>
+          <h4 className="text-xl font-semibold text-neutral-900 mb-4">{t('reservations.consumptionTypeTitle')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {CONSUMPTION_TYPES.map((type) => (
               <button
@@ -774,12 +863,12 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
                 <h5 className={`font-bold mb-1 ${
                   data.consumptionType === type.id ? 'text-amber-900' : 'text-neutral-900'
                 }`}>
-                  {type.name}
+                  {t(`reservations.consumptionTypes.${type.id}.name`)}
                 </h5>
                 <p className={`text-xs ${
                   data.consumptionType === type.id ? 'text-amber-700' : 'text-neutral-600'
                 }`}>
-                  {type.description}
+                  {t(`reservations.consumptionTypes.${type.id}.description`)}
                 </p>
               </button>
             ))}
@@ -790,16 +879,20 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
       {/* Resumen de selección */}
       {(data.zone || data.consumptionType) && (
         <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h5 className="font-semibold text-amber-900 mb-2">Selección actual:</h5>
+          <h5 className="font-semibold text-amber-900 mb-2">{t('reservations.currentSelection')}</h5>
           <div className="text-amber-800 space-y-1">
             {data.zone && (
-              <p><span className="font-medium">Zona:</span> {selectedZone?.name}</p>
+              <p><span className="font-medium">{t('reservations.zone')}:</span> {t(`reservations.zones.${data.zone}.name`)}</p>
             )}
-            {data.table && (
-              <p><span className="font-medium">Mesa:</span> {availableTables.find(t => t.id === data.table)?.name} ({availableTables.find(t => t.id === data.table)?.type})</p>
-            )}
+            {data.table && (() => {
+              const selId = getTableIdFromWizardId(String(data.table));
+              const selTable = selId ? tables.find(t => t.id === selId) : undefined;
+              return (
+                <p><span className="font-medium">{t('reservations.table')}:</span> {selTable ? `${selTable.number}` : data.table}</p>
+              );
+            })()}
             {data.consumptionType && (
-              <p><span className="font-medium">Tipo de consumo:</span> {CONSUMPTION_TYPES.find(t => t.id === data.consumptionType)?.name}</p>
+              <p><span className="font-medium">{t('reservations.consumptionType')}:</span> {t(`reservations.consumptionTypes.${data.consumptionType}.name`)}</p>
             )}
           </div>
         </div>
@@ -810,6 +903,9 @@ function StepZona({ data, onUpdate }: { data: ReservationData; onUpdate: (data: 
 
 function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const { tables, getTableIdFromWizardId } = useTablesManager();
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-PE';
 
   const validateField = (field: string, value: string) => {
     const newErrors = { ...errors };
@@ -817,9 +913,9 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
     switch (field) {
       case 'customerName':
         if (!value.trim()) {
-          newErrors.customerName = 'El nombre es obligatorio';
+          newErrors.customerName = t('reservations.errors.customerNameRequired');
         } else if (value.trim().length < 2) {
-          newErrors.customerName = 'El nombre debe tener al menos 2 caracteres';
+          newErrors.customerName = t('reservations.errors.customerNameMinLength');
         } else {
           delete newErrors.customerName;
         }
@@ -827,18 +923,18 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       case 'customerEmail':
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!value.trim()) {
-          newErrors.customerEmail = 'El email es obligatorio';
+          newErrors.customerEmail = t('reservations.errors.customerEmailRequired');
         } else if (!emailRegex.test(value)) {
-          newErrors.customerEmail = 'Ingresa un email válido';
+          newErrors.customerEmail = t('reservations.errors.invalidEmail');
         } else {
           delete newErrors.customerEmail;
         }
         break;
       case 'customerPhone':
         if (!value.trim()) {
-          newErrors.customerPhone = 'El teléfono es obligatorio';
+          newErrors.customerPhone = t('reservations.errors.customerPhoneRequired');
         } else if (value.trim().length < 8) {
-          newErrors.customerPhone = 'El teléfono debe tener al menos 8 dígitos';
+          newErrors.customerPhone = t('reservations.errors.phoneMinLength');
         } else {
           delete newErrors.customerPhone;
         }
@@ -858,43 +954,50 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Tus datos</h3>
-        <p className="text-neutral-600">Completa la información para confirmar tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.yourDetailsTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.yourDetailsSubtitle')}</p>
       </div>
 
       {/* Resumen de la reserva */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-8">
-        <h4 className="text-lg font-semibold text-amber-900 mb-4">Resumen de tu reserva</h4>
+        <h4 className="text-lg font-semibold text-amber-900 mb-4">{t('reservations.reservationSummaryTitle')}</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-amber-800">
-              <span className="font-medium">Personas:</span> {totalGuests} 
-              {data.adults && ` (${data.adults} adultos`}
-              {data.children && data.children > 0 && `, ${data.children} niños`}
-              {data.babies && data.babies > 0 && `, ${data.babies} bebés`}
+              <span className="font-medium">{t('reservations.people')}:</span> {totalGuests} 
+              {data.adults && ` (${data.adults} ${t('reservations.adults')}`}
+              {data.children && data.children > 0 && `, ${data.children} ${t('reservations.children')}`}
+              {data.babies && data.babies > 0 && `, ${data.babies} ${t('reservations.babies')}`}
               {data.adults && ')'}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Fecha:</span> {data.date ? new Date(data.date).toLocaleDateString('es-ES', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              }) : 'No seleccionada'}
-            </p>
-            <p className="text-amber-800">
-              <span className="font-medium">Hora:</span> {data.time || 'No seleccionada'}
-            </p>
+              <span className="font-medium">{t('reservations.date')}:</span> {data.date
+                 ? new Date(data.date).toLocaleDateString(locale, {
+                     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                   })
+                 : t('reservations.notSelected')}
+             </p>
+             <p className="text-amber-800">
+               <span className="font-medium">{t('reservations.time')}:</span> {data.time
+                 ? new Date(`1970-01-01T${data.time}`).toLocaleTimeString(locale, {
+                     hour: '2-digit', minute: '2-digit'
+                   })
+                 : t('reservations.notSelected')}
+             </p>
           </div>
           <div>
             <p className="text-amber-800">
-              <span className="font-medium">Zona:</span> {getZoneName(data.zone || '')}
+              <span className="font-medium">{t('reservations.zone')}:</span> {data.zone ? t(`reservations.zones.${data.zone}.name`) : t('reservations.notSelected')}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Mesa:</span> {data.table || 'No seleccionada'}
+              <span className="font-medium">{t('reservations.table')}:</span> {(() => {
+                 const selId = getTableIdFromWizardId(String(data.table));
+                 const selTable = selId ? tables.find(t => t.id === selId) : undefined;
+                 return selTable ? `${selTable.number}` : data.table;
+               })()}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Tipo:</span> {getConsumptionTypeName(data.consumptionType || '')}
+              <span className="font-medium">{t('reservations.type')}:</span> {data.consumptionType ? t(`reservations.consumptionTypes.${data.consumptionType}.name`) : t('reservations.notSelected')}
             </p>
           </div>
         </div>
@@ -904,7 +1007,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       <div className="space-y-6">
         <div>
           <label htmlFor="customerName" className="block text-sm font-medium text-neutral-700 mb-2">
-            Nombre completo *
+            {t('reservations.form.customerName')} *
           </label>
           <input
             type="text"
@@ -914,7 +1017,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerName ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="Ingresa tu nombre completo"
+            placeholder={t('reservations.form.customerNamePlaceholder')}
           />
           {errors.customerName && (
             <p className="mt-1 text-sm text-red-600">{errors.customerName}</p>
@@ -923,7 +1026,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="customerEmail" className="block text-sm font-medium text-neutral-700 mb-2">
-            Email *
+            {t('reservations.form.email')} *
           </label>
           <input
             type="email"
@@ -933,7 +1036,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerEmail ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="tu@email.com"
+            placeholder={t('reservations.form.emailPlaceholder')}
           />
           {errors.customerEmail && (
             <p className="mt-1 text-sm text-red-600">{errors.customerEmail}</p>
@@ -942,7 +1045,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="customerPhone" className="block text-sm font-medium text-neutral-700 mb-2">
-            Teléfono *
+            {t('reservations.form.phone')} *
           </label>
           <input
             type="tel"
@@ -952,7 +1055,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerPhone ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="+1 234 567 8900"
+            placeholder={t('reservations.form.phonePlaceholder')}
           />
           {errors.customerPhone && (
             <p className="mt-1 text-sm text-red-600">{errors.customerPhone}</p>
@@ -961,7 +1064,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="specialRequests" className="block text-sm font-medium text-neutral-700 mb-2">
-            Solicitudes especiales (opcional)
+            {t('reservations.form.specialRequestsLabel')}
           </label>
           <textarea
             id="specialRequests"
@@ -969,7 +1072,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             onChange={(e) => onUpdate({ specialRequests: e.target.value })}
             rows={4}
             className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors resize-none"
-            placeholder="Alergias, celebraciones especiales, preferencias de mesa, etc."
+            placeholder={t('reservations.form.specialRequestsPlaceholder')}
           />
         </div>
 
@@ -983,13 +1086,13 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-neutral-300 rounded"
           />
           <label htmlFor="acceptTerms" className="text-sm text-neutral-700">
-            Acepto los{' '}
+            {t('reservations.acceptTermsStart')}
             <a href="#" className="text-amber-600 hover:text-amber-700 underline">
-              términos y condiciones
-            </a>{' '}
-            y la{' '}
+              {t('footer.termsOfService')}
+            </a>
+            {t('reservations.acceptTermsAnd')}
             <a href="#" className="text-amber-600 hover:text-amber-700 underline">
-              política de privacidad
+              {t('footer.privacyPolicy')}
             </a>
             *
           </label>
@@ -1001,12 +1104,12 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
         <div className="flex items-start space-x-3">
           <div className="text-blue-600 text-xl">ℹ️</div>
           <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Información importante:</p>
+            <p className="font-medium mb-1">{t('reservations.infoImportantTitle')}</p>
             <ul className="space-y-1 text-xs">
-              <li>• Recibirás un email de confirmación en los próximos minutos</li>
-              <li>• Las reservas se confirman sujetas a disponibilidad</li>
-              <li>• Puedes cancelar o modificar tu reserva hasta 2 horas antes</li>
-              <li>• Para grupos de más de 8 personas, contacta directamente al restaurante</li>
+              <li>• {t('reservations.infoImportantBullets.bullet1')}</li>
+              <li>• {t('reservations.infoImportantBullets.bullet2')}</li>
+              <li>• {t('reservations.infoImportantBullets.bullet3')}</li>
+              <li>• {t('reservations.infoImportantBullets.bullet4')}</li>
             </ul>
           </div>
         </div>
@@ -1014,3 +1117,4 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
     </div>
   );
 }
+

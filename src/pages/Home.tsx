@@ -19,32 +19,10 @@ export default function Home() {
       }
     };
 
-    const observerOptions = {
-      threshold: [0, 0.1, 0.5, 1], // Multiple thresholds for better detection
-      rootMargin: '-50px 0px -50px 0px' // Trigger when element is more centered
-    };
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          // Element is entering viewport - add revealed class
-          entry.target.classList.add('revealed');
-        } else {
-          // Element is leaving viewport - remove revealed class to reset animation
-          entry.target.classList.remove('revealed');
-        }
-      });
-    }, observerOptions);
-
-    // Observe all scroll-reveal elements with different classes
-    const scrollElements = document.querySelectorAll('.scroll-reveal, .scroll-reveal-left, .scroll-reveal-right, .scroll-reveal-up, .scroll-reveal-zoom');
-    scrollElements.forEach((el) => observer.observe(el));
-
     window.addEventListener('scroll', handleScroll);
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      observer.disconnect();
     };
   }, []);
   const features = [
@@ -124,10 +102,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-neutral-50 via-white to-amber-50/30 scroll-reveal-up">
+      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-neutral-50 via-white to-amber-50/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Enhanced section header */}
-          <div className="text-center mb-12 sm:mb-16 scroll-reveal-zoom reveal-delay-1">
+          <div className="text-center mb-12 sm:mb-16">
             <div className="inline-block mb-4">
               <div className="w-20 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full mx-auto mb-4"></div>
             </div>
@@ -143,11 +121,7 @@ export default function Home() {
             {features.map((feature, index) => (
               <div
                 key={index}
-                className={`group relative bg-white p-3 sm:p-8 rounded-2xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 hover:rotate-1 overflow-hidden border border-neutral-100 hover:border-amber-200 ${
-                  index === 0 ? 'scroll-reveal-left reveal-delay-2' : 
-                  index === 1 ? 'scroll-reveal-up reveal-delay-3' : 
-                  'scroll-reveal-right reveal-delay-4'
-                }`}
+                className={`group relative bg-white p-3 sm:p-8 rounded-2xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 hover:rotate-1 overflow-hidden border border-neutral-100 hover:border-amber-200`}
               >
                 {/* Gradient background overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-transparent to-orange-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -182,10 +156,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-6 sm:py-16 lg:py-20 bg-gradient-to-br from-neutral-100 via-amber-50/20 to-orange-50/30 scroll-reveal-right">
+      <section className="py-6 sm:py-16 lg:py-20 bg-gradient-to-br from-neutral-100 via-amber-50/20 to-orange-50/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-12 items-center">
-            <div className="scroll-reveal-left reveal-delay-1 order-2 lg:order-1">
+            <div className="order-2 lg:order-1">
               {/* Enhanced title with gradient */}
               <div className="mb-6">
                 <div className="w-16 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full mb-4"></div>
@@ -204,7 +178,7 @@ export default function Home() {
             </div>
 
             {/* Enhanced team image section */}
-            <div className="relative scroll-reveal-zoom reveal-delay-2 order-1 lg:order-2">
+            <div className="relative order-1 lg:order-2">
               <div className="group relative bg-gradient-to-br from-amber-100 via-orange-100 to-amber-50 rounded-3xl p-6 sm:p-8 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:scale-105">
                 {/* Animated background elements */}
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-200/30 via-transparent to-orange-200/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -223,7 +197,7 @@ export default function Home() {
             </div>
 
             {/* Enhanced info card */}
-            <div className="group bg-white p-6 sm:p-8 rounded-2xl shadow-xl lg:col-span-2 scroll-reveal-up reveal-delay-3 order-3 border border-neutral-100 hover:border-amber-200 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden">
+            <div className="group bg-white p-6 sm:p-8 rounded-2xl shadow-xl lg:col-span-2 order-3 border border-neutral-100 hover:border-amber-200 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden">
               {/* Background gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-amber-50/30 via-transparent to-orange-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
@@ -238,7 +212,7 @@ export default function Home() {
               </div>
               
               <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                <div className="group/item flex items-start space-x-3 sm:space-x-4 scroll-reveal-left reveal-delay-4 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
+                <div className="group/item flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
                   <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover/item:shadow-xl group-hover/item:scale-110 transition-all duration-300">
                     <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
@@ -252,7 +226,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="group/item flex items-start space-x-3 sm:space-x-4 scroll-reveal-up reveal-delay-5 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
+                <div className="group/item flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
                   <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover/item:shadow-xl group-hover/item:scale-110 transition-all duration-300">
                     <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
@@ -266,7 +240,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="group/item flex items-start space-x-3 sm:space-x-4 scroll-reveal-right reveal-delay-6 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
+                <div className="group/item flex items-start space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-xl hover:bg-amber-50/50 transition-all duration-300">
                   <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover/item:shadow-xl group-hover/item:scale-110 transition-all duration-300">
                     <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>

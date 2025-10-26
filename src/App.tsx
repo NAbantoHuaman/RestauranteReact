@@ -4,20 +4,21 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
-import Tables from './pages/Tables';
+
 import Reservations from './pages/Reservations';
 import ReservationForm from './pages/ReservationForm';
+import ReservationView from './pages/ReservationView';
 
 function AppContent() {
   const location = useLocation();
   
-  // Determinar la página actual basada en la ruta
   const getCurrentPage = () => {
-    const path = location.pathname;
+    const path = window.location.pathname;
     if (path === '/') return 'home';
     if (path === '/menu') return 'menu';
-    if (path === '/tables') return 'tables';
-    if (path === '/reservations' || path === '/reservation-form') return 'reservations';
+    if (path === '/reservations') return 'reservations';
+
+    if (path === '/reservation-form') return 'reservation-form';
     return 'home';
   };
 
@@ -30,9 +31,10 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/menu" element={<Menu />} />
-          <Route path="/tables" element={<Tables />} />
+
           <Route path="/reservations" element={<Reservations />} />
           <Route path="/reservation-form" element={<ReservationForm />} />
+          <Route path="/reservation-view" element={<ReservationView />} />
         </Routes>
       </main>
       <Footer />

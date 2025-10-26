@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Users, Calendar, Clock, MapPin, User } from 'lucide-react';
 import { useTablesManager } from '../hooks/useTablesManager';
+import { RESTAURANT_ZONES, CONSUMPTION_TYPES, getZoneName, getConsumptionTypeName } from '../config/restaurantConfig';
+import { useLanguage } from '../contexts/LanguageContext';
+import { formatTimeLabel } from '../utils/dateTime';
 
 interface WizardProps {
   onClose: () => void;
@@ -24,14 +27,6 @@ interface ReservationData {
   acceptTerms?: boolean;
 }
 
-const STEPS = [
-  { id: 1, title: 'Personas', icon: Users, description: 'Elige la cantidad de personas' },
-  { id: 2, title: 'Fecha', icon: Calendar, description: 'Selecciona la fecha' },
-  { id: 3, title: 'Hora', icon: Clock, description: 'Elige el horario' },
-  { id: 4, title: 'Zona y Tipo de consumo', icon: MapPin, description: 'Selecciona tu mesa' },
-  { id: 5, title: 'Tus datos', icon: User, description: 'Información de contacto' }
-];
-
 export default function ReservationWizard({ onClose, onComplete }: WizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [reservationData, setReservationData] = useState<ReservationData>({
@@ -46,7 +41,9 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
     customerPhone: ''
   });
 
-  // Integrar el hook de gestión de mesas
+  const { reservations, addReservation, tables, removeReservation, refreshReservations, getAvailableTablesForZone, isTableAvailableForDateTime } = useTablesManager();
+  const { t } = useLanguage();
+
   const { 
     tables, 
     getAvailableTablesForZone, 
@@ -58,8 +55,17 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
     setReservationData(prev => ({ ...prev, ...data }));
   };
 
+  // Pasos localizados para el encabezado del wizard
+  const LOCALIZED_STEPS = [
+    { id: 1, title: t('reservations.choosePeopleTitle'), icon: Users },
+    { id: 2, title: t('reservations.selectDateTitle'), icon: Calendar },
+    { id: 3, title: t('reservations.selectTimeTitle'), icon: Clock },
+    { id: 4, title: t('reservations.chooseZoneTypeTitle'), icon: MapPin },
+    { id: 5, title: t('reservations.yourDetailsTitle'), icon: User },
+  ];
+
   const nextStep = () => {
-    if (currentStep < STEPS.length) {
+    if (currentStep < LOCALIZED_STEPS.length) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -93,36 +99,51 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
   const getValidationMessage = () => {
     switch (currentStep) {
       case 1:
-        return reservationData.adults === 0 ? 'Debe seleccionar al menos 1 adulto' : '';
+        return reservationData.adults === 0 ? t('reservations.errors.mustSelectAdults') : '';
       case 2:
-        return reservationData.date === '' ? 'Debe seleccionar una fecha' : '';
+        return reservationData.date === '' ? t('reservations.errors.mustSelectDate') : '';
       case 3:
-        return reservationData.time === '' ? 'Debe seleccionar una hora' : '';
+        return reservationData.time === '' ? t('reservations.errors.mustSelectTime') : '';
       case 4:
-        if (reservationData.zone === '') return 'Debe seleccionar una zona';
-        if (reservationData.table === '') return 'Debe seleccionar una mesa';
-        if (reservationData.consumptionType === '') return 'Debe seleccionar un tipo de consumo';
+        if (reservationData.zone === '') return t('reservations.errors.mustSelectZone');
+        if (reservationData.table === '') return t('reservations.errors.mustSelectTable');
+        if (reservationData.consumptionType === '') return t('reservations.errors.mustSelectConsumptionType');
         return '';
       case 5:
-        if (reservationData.customerName === '') return 'Debe ingresar su nombre';
-        if (reservationData.customerEmail === '') return 'Debe ingresar su email';
-        if (reservationData.customerPhone === '') return 'Debe ingresar su teléfono';
-        if (!reservationData.acceptTerms) return 'Debe aceptar los términos y condiciones';
+        if (reservationData.customerName === '') return t('reservations.errors.customerNameRequired');
+        if (reservationData.customerEmail === '') return t('reservations.errors.customerEmailRequired');
+        if (reservationData.customerPhone === '') return t('reservations.errors.customerPhoneRequired');
+        if (!reservationData.acceptTerms) return t('reservations.errors.acceptTermsRequired');
         return '';
       default:
         return '';
     }
   };
 
-  const handleComplete = () => {
-    if (canProceed()) {
-      // Usar el hook para agregar la reserva
-      const success = addReservation(reservationData);
-      if (success) {
-        onComplete(reservationData);
-      } else {
-        alert('Error al crear la reserva. Por favor, intenta nuevamente.');
-      }
+  const handleComplete = async () => {
+    try {
+      const totalGuests = reservationData.adults + reservationData.children + reservationData.babies;
+      
+      const reservationToAdd = {
+        id: Date.now(),
+        tableId: parseInt(reservationData.tableId),
+        customerName: reservationData.customerName,
+        customerEmail: reservationData.customerEmail,
+        customerPhone: reservationData.customerPhone,
+        date: reservationData.date,
+        time: reservationData.time,
+        guests: totalGuests,
+        status: 'confirmed' as const,
+        specialRequests: reservationData.specialRequests || '',
+        zone: reservationData.zone || '',
+        table: reservationData.table || '',
+        consumptionType: reservationData.consumptionType || ''
+      };
+
+      await addReservation(reservationToAdd);
+      onComplete(reservationData);
+    } catch (error) {
+      console.error('Error al crear la reserva:', error);
     }
   };
 
@@ -132,7 +153,7 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
         {/* Header con progreso */}
         <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white p-4 sm:p-6 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl sm:text-2xl font-bold">Nueva Reserva</h2>
+            <h2 className="text-xl sm:text-2xl font-bold">{t('reservations.newReservation')}</h2>
             <button
               onClick={onClose}
               className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-colors"
@@ -143,7 +164,7 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
           
           {/* Indicador de progreso */}
           <div className="flex items-center space-x-2">
-            {STEPS.map((step, index) => {
+            {LOCALIZED_STEPS.map((step, index) => {
               const Icon = step.icon;
               const isActive = step.id === currentStep;
               const isCompleted = step.id < currentStep;
@@ -160,7 +181,7 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
                     <Icon className="h-4 w-4" />
                     <span className="text-sm font-medium hidden sm:block">{step.title}</span>
                   </div>
-                  {index < STEPS.length - 1 && (
+                  {index < LOCALIZED_STEPS.length - 1 && (
                     <ChevronRight className="h-4 w-4 mx-2 text-white text-opacity-60" />
                   )}
                 </div>
@@ -221,7 +242,7 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
             }`}
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Anterior</span>
+            <span className="hidden sm:inline">{t('reservations.prev')}</span>
           </button>
 
           {/* Validation Message */}
@@ -234,10 +255,10 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
           </div>
 
           <div className="text-xs sm:text-sm text-neutral-500">
-            Paso {currentStep} de {STEPS.length}
+            {t('reservations.stepCounter', { current: currentStep, total: LOCALIZED_STEPS.length })}
           </div>
 
-          {currentStep < STEPS.length ? (
+          {currentStep < LOCALIZED_STEPS.length ? (
             <button
               onClick={nextStep}
               disabled={!canProceed()}
@@ -272,26 +293,23 @@ export default function ReservationWizard({ onClose, onComplete }: WizardProps) 
 }
 
 // Componentes para cada paso
-function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
-  const totalGuests = data.adults + data.children + data.babies;
-  const maxGuests = 8;
+
+const StepPersonas: React.FC<StepProps> = ({ data, onUpdate, onNext, onPrev }) => {
+  const maxGuests = 10;
+  const totalGuests = (data.adults || 0) + (data.children || 0) + (data.babies || 0);
 
   const updateCount = (type: 'adults' | 'children' | 'babies', increment: boolean) => {
-    const currentValue = data[type];
+    const currentValue = data[type] || 0;
     let newValue = increment ? currentValue + 1 : currentValue - 1;
     
-    // Validaciones
-    if (type === 'adults' && newValue < 1) newValue = 1; // Mínimo 1 adulto
+    if (type === 'adults' && newValue < 1) newValue = 1;
     if (newValue < 0) newValue = 0;
     
-    // Verificar límite total
-    const newTotal = type === 'adults' 
-      ? newValue + data.children + data.babies
-      : type === 'children'
-        ? data.adults + newValue + data.babies
-        : data.adults + data.children + newValue;
+    const totalGuests = (type === 'adults' ? newValue : data.adults) + 
+                       (type === 'children' ? newValue : data.children) + 
+                       (type === 'babies' ? newValue : data.babies);
     
-    if (newTotal > maxGuests) return;
+    if (totalGuests > 10) return;
     
     onUpdate({ [type]: newValue });
   };
@@ -345,26 +363,26 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Elige la cantidad de personas</h3>
-        <p className="text-neutral-600">* Bebés y niños deben ser incluidos en la cantidad de personas</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.choosePeopleTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.childrenNote')}</p>
       </div>
 
       <div className="space-y-4 mb-8">
         <PersonCounter
-          title="Adultos"
-          subtitle="13 años en adelante"
+          title={t('reservations.adults')}
+          subtitle={t('reservations.adultsSubtitle')}
           count={data.adults}
           type="adults"
         />
         <PersonCounter
-          title="Niños"
-          subtitle="2-12 años"
+          title={t('reservations.children')}
+          subtitle={t('reservations.childrenSubtitle')}
           count={data.children}
           type="children"
         />
         <PersonCounter
-          title="Bebés"
-          subtitle="0-23 meses"
+          title={t('reservations.babies')}
+          subtitle={t('reservations.babiesSubtitle')}
           count={data.babies}
           type="babies"
         />
@@ -372,9 +390,9 @@ function StepPersonas({ data, onUpdate }: { data: ReservationData; onUpdate: (da
 
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
         <p className="text-amber-800">
-          <span className="font-semibold">Total: {totalGuests} persona{totalGuests !== 1 ? 's' : ''}</span>
+          <span className="font-semibold">{t('reservations.totalPeople', { count: totalGuests })}</span>
           {totalGuests >= maxGuests && (
-            <span className="block text-sm mt-1">Máximo {maxGuests} personas por reserva</span>
+            <span className="block text-sm mt-1">{t('reservations.maxPeoplePerReservation', { max: maxGuests })}</span>
           )}
         </p>
       </div>
@@ -386,8 +404,9 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   const today = new Date();
   const maxDate = new Date();
   maxDate.setMonth(maxDate.getMonth() + 2); // Permitir reservas hasta 2 meses adelante
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-ES';
 
-  // Generar fechas disponibles (próximos 60 días, excluyendo algunos días como ejemplo)
   const generateAvailableDates = () => {
     const dates = [];
     const current = new Date(today);
@@ -396,16 +415,15 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       const date = new Date(current);
       date.setDate(current.getDate() + i);
       
-      // Excluir algunos días como ejemplo (puedes personalizar esta lógica)
       const dayOfWeek = date.getDay();
-      const isAvailable = dayOfWeek !== 1; // Excluir lunes como ejemplo
+      const isAvailable = dayOfWeek !== 1;
       
       if (isAvailable) {
         dates.push({
           date: date.toISOString().split('T')[0],
-          dayName: date.toLocaleDateString('es-ES', { weekday: 'long' }),
+          dayName: date.toLocaleDateString(locale, { weekday: 'long' }),
           dayNumber: date.getDate(),
-          monthName: date.toLocaleDateString('es-ES', { month: 'long' }),
+          monthName: date.toLocaleDateString(locale, { month: 'long' }),
           isToday: date.toDateString() === today.toDateString(),
           isTomorrow: date.toDateString() === new Date(today.getTime() + 24 * 60 * 60 * 1000).toDateString()
         });
@@ -418,16 +436,16 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   const availableDates = generateAvailableDates();
 
   const formatDateDisplay = (dateInfo: any) => {
-    if (dateInfo.isToday) return 'Hoy';
-    if (dateInfo.isTomorrow) return 'Mañana';
+    if (dateInfo.isToday) return t('reservations.today');
+    if (dateInfo.isTomorrow) return t('reservations.tomorrow');
     return `${dateInfo.dayName.charAt(0).toUpperCase() + dateInfo.dayName.slice(1)}`;
   };
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Selecciona la fecha</h3>
-        <p className="text-neutral-600">Elige el día para tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.selectDateTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.selectDateSubtitle')}</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
@@ -465,10 +483,13 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       {data.date && (
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
           <p className="text-amber-800">
-            <span className="font-semibold">Fecha seleccionada: </span>
-            {availableDates.find(d => d.date === data.date)?.dayName} {' '}
-            {availableDates.find(d => d.date === data.date)?.dayNumber} de {' '}
-            {availableDates.find(d => d.date === data.date)?.monthName}
+            <span className="font-semibold">{t('reservations.selectedDate')}: </span>
+            {new Date(data.date).toLocaleDateString(locale, {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })}
           </p>
         </div>
       )}
@@ -476,47 +497,50 @@ function StepFecha({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
   );
 }
 
-function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: { 
+function StepHora({ 
+  data, 
+  onUpdate, 
+  tables, 
+  isTableAvailableForDateTime 
+}: { 
   data: ReservationData; 
   onUpdate: (data: Partial<ReservationData>) => void;
   tables: any[];
   isTableAvailableForDateTime: (tableId: number, date: string, time: string) => boolean;
 }) {
+  const { t, language } = useLanguage();
   const timeSlots = [
-    { time: '12:00', label: '12:00 PM', period: 'Almuerzo' },
-    { time: '12:30', label: '12:30 PM', period: 'Almuerzo' },
-    { time: '13:00', label: '1:00 PM', period: 'Almuerzo' },
-    { time: '13:30', label: '1:30 PM', period: 'Almuerzo' },
-    { time: '14:00', label: '2:00 PM', period: 'Almuerzo' },
-    { time: '14:30', label: '2:30 PM', period: 'Almuerzo' },
-    { time: '19:00', label: '7:00 PM', period: 'Cena' },
-    { time: '19:30', label: '7:30 PM', period: 'Cena' },
-    { time: '20:00', label: '8:00 PM', period: 'Cena' },
-    { time: '20:30', label: '8:30 PM', period: 'Cena' },
-    { time: '21:00', label: '9:00 PM', period: 'Cena' },
-    { time: '21:30', label: '9:30 PM', period: 'Cena' },
-    { time: '22:00', label: '10:00 PM', period: 'Cena' }
+    { time: '12:00', label: formatTimeLabel(language, '12:00'), period: 'lunch' },
+    { time: '12:30', label: formatTimeLabel(language, '12:30'), period: 'lunch' },
+    { time: '13:00', label: formatTimeLabel(language, '13:00'), period: 'lunch' },
+    { time: '13:30', label: formatTimeLabel(language, '13:30'), period: 'lunch' },
+    { time: '14:00', label: formatTimeLabel(language, '14:00'), period: 'lunch' },
+    { time: '14:30', label: formatTimeLabel(language, '14:30'), period: 'lunch' },
+    { time: '15:00', label: formatTimeLabel(language, '15:00'), period: 'lunch' },
+    { time: '15:30', label: formatTimeLabel(language, '15:30'), period: 'lunch' },
+    { time: '19:00', label: formatTimeLabel(language, '19:00'), period: 'dinner' },
+    { time: '19:30', label: formatTimeLabel(language, '19:30'), period: 'dinner' },
+    { time: '20:00', label: formatTimeLabel(language, '20:00'), period: 'dinner' },
+    { time: '20:30', label: formatTimeLabel(language, '20:30'), period: 'dinner' },
+    { time: '21:00', label: formatTimeLabel(language, '21:00'), period: 'dinner' },
+    { time: '21:30', label: formatTimeLabel(language, '21:30'), period: 'dinner' },
+    { time: '22:00', label: formatTimeLabel(language, '22:00'), period: 'dinner' },
+    { time: '22:30', label: formatTimeLabel(language, '22:30'), period: 'dinner' },
   ];
 
-  // Verificar disponibilidad real basada en reservas existentes
-  const getAvailability = (time: string) => {
-    // Si no hay fecha seleccionada, mostrar todos los horarios como disponibles
+  const isTimeAvailable = (time: string) => {
     if (!data.date) return true;
     
-    // Verificar si hay alguna mesa disponible para esta fecha y hora
-    // Si al menos una mesa está disponible, el horario está disponible
-    const availableTablesForTime = tables.filter(table => 
-      isTableAvailableForDateTime(table.id, data.date!, time)
+    return tables.some(table => 
+      isTableAvailableForDateTime(table.id, data.date, time)
     );
-    
-    return availableTablesForTime.length > 0;
   };
 
-  const lunchSlots = timeSlots.filter(slot => slot.period === 'Almuerzo');
-  const dinnerSlots = timeSlots.filter(slot => slot.period === 'Cena');
+  const lunchSlots = timeSlots.filter(slot => slot.period === 'lunch');
+  const dinnerSlots = timeSlots.filter(slot => slot.period === 'dinner');
 
   const TimeSlotButton = ({ slot }: { slot: any }) => {
-    const isAvailable = getAvailability(slot.time);
+    const isAvailable = isTimeAvailable(slot.time);
     const isSelected = data.time === slot.time;
 
     return (
@@ -538,7 +562,7 @@ function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: {
             {slot.label}
           </div>
           {!isAvailable && (
-            <div className="text-xs text-red-500">No disponible</div>
+            <div className="text-xs text-red-500">{t('reservations.notAvailable')}</div>
           )}
         </div>
       </button>
@@ -548,8 +572,8 @@ function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Elige el horario</h3>
-        <p className="text-neutral-600">Selecciona la hora para tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.selectTimeTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.selectTimeSubtitle')}</p>
       </div>
 
       <div className="space-y-8">
@@ -557,7 +581,7 @@ function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: {
         <div>
           <h4 className="text-xl font-semibold text-neutral-900 mb-4 flex items-center">
             <span className="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-            Almuerzo
+            {t('reservations.lunch')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {lunchSlots.map((slot) => (
@@ -570,7 +594,7 @@ function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: {
         <div>
           <h4 className="text-xl font-semibold text-neutral-900 mb-4 flex items-center">
             <span className="w-3 h-3 bg-purple-500 rounded-full mr-3"></span>
-            Cena
+            {t('reservations.dinner')}
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {dinnerSlots.map((slot) => (
@@ -583,17 +607,15 @@ function StepHora({ data, onUpdate, tables, isTableAvailableForDateTime }: {
       {data.time && (
         <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
           <p className="text-amber-800">
-            <span className="font-semibold">Horario seleccionado: </span>
+            <span className="font-semibold">{t('reservations.selectedTime')}: </span>
             {timeSlots.find(slot => slot.time === data.time)?.label} - {' '}
-            {timeSlots.find(slot => slot.time === data.time)?.period}
+            {(timeSlots.find(slot => slot.time === data.time)?.period === 'lunch') ? t('reservations.lunch') : t('reservations.dinner')}
           </p>
         </div>
       )}
     </div>
   );
 }
-
-import { RESTAURANT_ZONES, CONSUMPTION_TYPES, getZoneName, getConsumptionTypeName } from '../config/restaurantConfig';
 
 function StepZona({ 
   data, 
@@ -610,38 +632,33 @@ function StepZona({
   const totalGuests = (data.adults || 1) + (data.children || 0) + (data.babies || 0);
   const selectedZone = RESTAURANT_ZONES.find(zone => zone.id === data.zone);
   
-  // Obtener mesas disponibles usando el hook real
-  const availableTables = selectedZone?.tables.filter(table => {
-    // Verificar capacidad
-    if (table.capacity < totalGuests) return false;
-    
-    // Verificar disponibilidad real si tenemos fecha y hora
-    if (data.date && data.time && table.realId) {
-      return isTableAvailableForDateTime(table.realId as number, data.date, data.time);
-    }
-    
-    return true;
-  }) || [];
+  const availableTables = getAvailableTablesForZone(
+    data.zone || '',
+    totalGuests,
+    data.date || '',
+    data.time || ''
+  );
 
-  // Función para verificar disponibilidad de mesa específica
-  const getTableAvailability = (table: any) => {
-    if (!data.date || !data.time || !table.realId) {
-      return true; // Si no hay fecha/hora seleccionada, mostrar como disponible
-    }
-    return isTableAvailableForDateTime(table.realId, data.date, data.time);
+  // Obtener número real de mesa para el resumen
+  const { tables, getTableIdFromWizardId, getWizardIdFromTableId } = useTablesManager();
+
+  const isTableAvailable = (tableId: string) => {
+    if (!data.date || !data.time) return true;
+    const table = selectedZone?.tables.find(t => t.id === tableId);
+    return table?.realId ? isTableAvailableForDateTime(table.realId as number, data.date, data.time) : true;
   };
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Elige zona y tipo de consumo</h3>
-        <p className="text-neutral-600">Selecciona el ambiente y el tipo de experiencia que prefieres</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.chooseZoneTypeTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.chooseZoneTypeSubtitle')}</p>
       </div>
 
       <div className="space-y-8">
         {/* Selección de Zona */}
         <div>
-          <h4 className="text-xl font-semibold text-neutral-900 mb-4">Zona del restaurante</h4>
+          <h4 className="text-xl font-semibold text-neutral-900 mb-4">{t('reservations.restaurantZone')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {RESTAURANT_ZONES.map((zone) => (
               <button
@@ -657,17 +674,17 @@ function StepZona({
                 <h5 className={`text-lg font-bold mb-2 ${
                   data.zone === zone.id ? 'text-amber-900' : 'text-neutral-900'
                 }`}>
-                  {zone.name}
+                  {t(`reservations.zones.${zone.id}.name`)}
                 </h5>
                 <p className={`text-sm ${
                   data.zone === zone.id ? 'text-amber-700' : 'text-neutral-600'
                 }`}>
-                  {zone.description}
+                  {t(`reservations.zones.${zone.id}.description`)}
                 </p>
                 <div className={`text-xs mt-2 ${
                   data.zone === zone.id ? 'text-amber-600' : 'text-neutral-500'
                 }`}>
-                  {zone.tables.length} mesas disponibles
+                  {getAvailableTablesForZone(zone.id, totalGuests, data.date || '', data.time || '').length} {t('reservations.tablesAvailable')}
                 </div>
               </button>
             ))}
@@ -678,17 +695,20 @@ function StepZona({
         {data.zone && (
           <div>
             <h4 className="text-xl font-semibold text-neutral-900 mb-4">
-              Mesas disponibles en {selectedZone?.name}
+              {t('reservations.availableTablesIn')} {selectedZone ? t(`reservations.zones.${selectedZone.id}.name`) : ''}
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {availableTables.map((table) => {
-                const isAvailable = getTableAvailability(table);
-                const isSelected = data.table === table.id;
+                const wizardId = getWizardIdFromTableId(table.id) || String(table.id);
+                const isAvailable = data.date && data.time
+                  ? isTableAvailableForDateTime(table.id, data.date, data.time)
+                  : table.status === 'available';
+                const isSelected = data.table === wizardId;
                 
                 return (
                   <button
                     key={table.id}
-                    onClick={() => isAvailable && onUpdate({ table: table.id })}
+                    onClick={() => isAvailable && onUpdate({ table: wizardId })}
                     disabled={!isAvailable}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       !isAvailable
@@ -702,20 +722,20 @@ function StepZona({
                       <div className={`font-bold mb-1 ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-900' : 'text-neutral-900'
                       }`}>
-                        {table.name}
+                        {t('reservations.table')} {table.number}
                       </div>
                       <div className={`text-xs mb-1 ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-700' : 'text-neutral-600'
                       }`}>
-                        {table.type}
+                        {t(`reservations.zones.${table.location}.name`)}
                       </div>
                       <div className={`text-xs ${
                         !isAvailable ? 'text-neutral-400' : isSelected ? 'text-amber-600' : 'text-neutral-500'
                       }`}>
-                        Hasta {table.capacity} personas
+                        {t('reservations.capacityUpTo', { count: table.capacity })}
                       </div>
                       {!isAvailable && (
-                        <div className="text-xs text-red-500 mt-1">Ocupada</div>
+                        <div className="text-xs text-red-500 mt-1">{t('reservations.occupied')}</div>
                       )}
                     </div>
                   </button>
@@ -724,9 +744,9 @@ function StepZona({
             </div>
             {availableTables.length === 0 && (
               <div className="text-center py-8 text-neutral-500">
-                No hay mesas disponibles para {totalGuests} personas en esta zona.
+                {t('reservations.noTablesAvailableZone', { count: totalGuests })}
                 <br />
-                Por favor, selecciona otra zona.
+                {t('reservations.selectAnotherZone')}
               </div>
             )}
           </div>
@@ -734,7 +754,7 @@ function StepZona({
 
         {/* Tipo de Consumo */}
         <div>
-          <h4 className="text-xl font-semibold text-neutral-900 mb-4">Tipo de consumo</h4>
+          <h4 className="text-xl font-semibold text-neutral-900 mb-4">{t('reservations.consumptionTypeTitle')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {CONSUMPTION_TYPES.map((type) => (
               <button
@@ -750,12 +770,12 @@ function StepZona({
                 <h5 className={`font-bold mb-1 ${
                   data.consumptionType === type.id ? 'text-amber-900' : 'text-neutral-900'
                 }`}>
-                  {type.name}
+                  {t(`reservations.consumptionTypes.${type.id}.name`)}
                 </h5>
                 <p className={`text-xs ${
                   data.consumptionType === type.id ? 'text-amber-700' : 'text-neutral-600'
                 }`}>
-                  {type.description}
+                  {t(`reservations.consumptionTypes.${type.id}.description`)}
                 </p>
               </button>
             ))}
@@ -766,16 +786,20 @@ function StepZona({
       {/* Resumen de selección */}
       {(data.zone || data.consumptionType) && (
         <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h5 className="font-semibold text-amber-900 mb-2">Selección actual:</h5>
+          <h5 className="font-semibold text-amber-900 mb-2">{t('reservations.currentSelection')}</h5>
           <div className="text-amber-800 space-y-1">
             {data.zone && (
-              <p><span className="font-medium">Zona:</span> {selectedZone?.name}</p>
+              <p><span className="font-medium">{t('reservations.zone')}:</span> {selectedZone ? t(`reservations.zones.${selectedZone.id}.name`) : ''}</p>
             )}
-            {data.table && (
-              <p><span className="font-medium">Mesa:</span> {availableTables.find(t => t.id === data.table)?.name} ({availableTables.find(t => t.id === data.table)?.type})</p>
-            )}
+            {data.table && (() => {
+              const selId = getTableIdFromWizardId(String(data.table));
+              const selTable = selId ? tables.find(t => t.id === selId) : undefined;
+              return (
+                <p><span className="font-medium">{t('reservations.table')}:</span> {selTable ? `${selTable.number}` : String(data.table)}</p>
+              );
+            })()}
             {data.consumptionType && (
-              <p><span className="font-medium">Tipo de consumo:</span> {CONSUMPTION_TYPES.find(t => t.id === data.consumptionType)?.name}</p>
+              <p><span className="font-medium">{t('reservations.consumptionType')}:</span> {data.consumptionType ? t(`reservations.consumptionTypes.${data.consumptionType}.name`) : ''}</p>
             )}
           </div>
         </div>
@@ -786,6 +810,9 @@ function StepZona({
 
 function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data: Partial<ReservationData>) => void }) {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-PE';
+  const { tables, getTableIdFromWizardId } = useTablesManager();
 
   const validateField = (field: string, value: string) => {
     const newErrors = { ...errors };
@@ -793,9 +820,9 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
     switch (field) {
       case 'customerName':
         if (!value.trim()) {
-          newErrors.customerName = 'El nombre es obligatorio';
+          newErrors.customerName = t('reservations.errors.customerNameRequired');
         } else if (value.trim().length < 2) {
-          newErrors.customerName = 'El nombre debe tener al menos 2 caracteres';
+          newErrors.customerName = t('reservations.errors.customerNameMinLength');
         } else {
           delete newErrors.customerName;
         }
@@ -803,18 +830,18 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       case 'customerEmail':
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!value.trim()) {
-          newErrors.customerEmail = 'El email es obligatorio';
+          newErrors.customerEmail = t('reservations.errors.customerEmailRequired');
         } else if (!emailRegex.test(value)) {
-          newErrors.customerEmail = 'Ingresa un email válido';
+          newErrors.customerEmail = t('reservations.errors.invalidEmail');
         } else {
           delete newErrors.customerEmail;
         }
         break;
       case 'customerPhone':
         if (!value.trim()) {
-          newErrors.customerPhone = 'El teléfono es obligatorio';
+          newErrors.customerPhone = t('reservations.errors.customerPhoneRequired');
         } else if (value.trim().length < 8) {
-          newErrors.customerPhone = 'El teléfono debe tener al menos 8 dígitos';
+          newErrors.customerPhone = t('reservations.errors.phoneMinLength');
         } else {
           delete newErrors.customerPhone;
         }
@@ -831,46 +858,49 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
   const totalGuests = (data.adults || 1) + (data.children || 0) + (data.babies || 0);
 
+  const selectedRealId = data.table ? getTableIdFromWizardId(String(data.table)) : null;
+  const selectedRealNumber = selectedRealId ? tables.find(t => t.id === selectedRealId)?.number : undefined;
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <h3 className="text-3xl font-bold text-neutral-900 mb-4">Tus datos</h3>
-        <p className="text-neutral-600">Completa la información para confirmar tu reserva</p>
+        <h3 className="text-3xl font-bold text-neutral-900 mb-4">{t('reservations.yourDetailsTitle')}</h3>
+        <p className="text-neutral-600">{t('reservations.yourDetailsSubtitle')}</p>
       </div>
 
       {/* Resumen de la reserva */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-8">
-        <h4 className="text-lg font-semibold text-amber-900 mb-4">Resumen de tu reserva</h4>
+        <h4 className="text-lg font-semibold text-amber-900 mb-4">{t('reservations.reservationSummaryTitle')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-amber-800">
-              <span className="font-medium">Personas:</span> {totalGuests} 
-              {data.adults && ` (${data.adults} adultos`}
-              {data.children && data.children > 0 && `, ${data.children} niños`}
-              {data.babies && data.babies > 0 && `, ${data.babies} bebés`}
+              <span className="font-medium">{t('reservations.people')}:</span> {totalGuests} 
+              {data.adults && ` (${data.adults} ${t('reservations.adults').toLowerCase()}`}
+              {data.children && data.children > 0 && `, ${data.children} ${t('reservations.children').toLowerCase()}`}
+              {data.babies && data.babies > 0 && `, ${data.babies} ${t('reservations.babies').toLowerCase()}`}
               {data.adults && ')'}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Fecha:</span> {data.date ? new Date(data.date).toLocaleDateString('es-ES', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              }) : 'No seleccionada'}
+              <span className="font-medium">{t('reservations.date')}:</span> {data.date ? new Intl.DateTimeFormat(locale, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }).format(new Date(data.date)) : t('reservations.notSelected')}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Hora:</span> {data.time || 'No seleccionada'}
+              <span className="font-medium">{t('reservations.time')}:</span> {data.time ? formatTimeLabel(language, data.time) : t('reservations.notSelected')}
             </p>
           </div>
           <div>
             <p className="text-amber-800">
-              <span className="font-medium">Zona:</span> {getZoneName(data.zone || '')}
+              <span className="font-medium">{t('reservations.zone')}:</span> {data.zone ? t(`reservations.zones.${data.zone}.name`) : t('reservations.notSelected')}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Mesa:</span> {data.table || 'No seleccionada'}
+              <span className="font-medium">{t('reservations.table')}:</span> {selectedRealNumber ?? t('reservations.notSelected')}
             </p>
             <p className="text-amber-800">
-              <span className="font-medium">Tipo:</span> {getConsumptionTypeName(data.consumptionType || '')}
+              <span className="font-medium">{t('reservations.type')}:</span> {data.consumptionType ? t(`reservations.consumptionTypes.${data.consumptionType}.name`) : t('reservations.notSelected')}
             </p>
           </div>
         </div>
@@ -880,7 +910,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
       <div className="space-y-6">
         <div>
           <label htmlFor="customerName" className="block text-sm font-medium text-neutral-700 mb-2">
-            Nombre completo *
+            {t('reservations.form.customerName')}
           </label>
           <input
             type="text"
@@ -890,7 +920,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerName ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="Ingresa tu nombre completo"
+            placeholder={t('reservations.form.customerNamePlaceholder')}
           />
           {errors.customerName && (
             <p className="mt-1 text-sm text-red-600">{errors.customerName}</p>
@@ -899,7 +929,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="customerEmail" className="block text-sm font-medium text-neutral-700 mb-2">
-            Email *
+            {t('reservations.form.email')}
           </label>
           <input
             type="email"
@@ -909,7 +939,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerEmail ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="tu@email.com"
+            placeholder={t('reservations.form.emailPlaceholder')}
           />
           {errors.customerEmail && (
             <p className="mt-1 text-sm text-red-600">{errors.customerEmail}</p>
@@ -918,7 +948,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="customerPhone" className="block text-sm font-medium text-neutral-700 mb-2">
-            Teléfono *
+            {t('reservations.form.phone')}
           </label>
           <input
             type="tel"
@@ -928,7 +958,7 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors ${
               errors.customerPhone ? 'border-red-500 bg-red-50' : 'border-neutral-300'
             }`}
-            placeholder="+1 234 567 8900"
+            placeholder={t('reservations.form.phonePlaceholder')}
           />
           {errors.customerPhone && (
             <p className="mt-1 text-sm text-red-600">{errors.customerPhone}</p>
@@ -937,53 +967,53 @@ function StepDatos({ data, onUpdate }: { data: ReservationData; onUpdate: (data:
 
         <div>
           <label htmlFor="specialRequests" className="block text-sm font-medium text-neutral-700 mb-2">
-            Solicitudes especiales (opcional)
+            {t('reservations.form.specialRequestsLabel')}
           </label>
           <textarea
             id="specialRequests"
+            rows={3}
             value={data.specialRequests || ''}
             onChange={(e) => onUpdate({ specialRequests: e.target.value })}
-            rows={4}
-            className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors resize-none"
-            placeholder="Alergias, celebraciones especiales, preferencias de mesa, etc."
+            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors border-neutral-300"
+            placeholder={t('reservations.form.specialRequestsPlaceholder')}
           />
         </div>
 
         {/* Términos y condiciones */}
         <div className="flex items-start space-x-3">
           <input
-            type="checkbox"
             id="acceptTerms"
+            type="checkbox"
             checked={data.acceptTerms || false}
             onChange={(e) => onUpdate({ acceptTerms: e.target.checked })}
             className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-neutral-300 rounded"
           />
           <label htmlFor="acceptTerms" className="text-sm text-neutral-700">
-            Acepto los{' '}
+            {t('reservations.errors.acceptTermsStart')}
             <a href="#" className="text-amber-600 hover:text-amber-700 underline">
-              términos y condiciones
-            </a>{' '}
-            y la{' '}
+              {t('footer.termsOfService')}
+            </a>
+            {t('reservations.errors.acceptTermsAnd')}
             <a href="#" className="text-amber-600 hover:text-amber-700 underline">
-              política de privacidad
+              {t('footer.privacyPolicy')}
             </a>
             *
           </label>
         </div>
-      </div>
 
-      {/* Información adicional */}
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start space-x-3">
-          <div className="text-blue-600 text-xl">ℹ️</div>
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-1">Información importante:</p>
-            <ul className="space-y-1 text-xs">
-              <li>• Recibirás un email de confirmación en los próximos minutos</li>
-              <li>• Las reservas se confirman sujetas a disponibilidad</li>
-              <li>• Puedes cancelar o modificar tu reserva hasta 2 horas antes</li>
-              <li>• Para grupos de más de 8 personas, contacta directamente al restaurante</li>
-            </ul>
+        {/* Información adicional */}
+        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <div className="text-blue-600 text-xl">ℹ️</div>
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">{t('reservations.infoImportantTitle')}</p>
+              <ul className="space-y-1 text-xs">
+                <li>• {t('reservations.infoImportantBullets.bullet1')}</li>
+                <li>• {t('reservations.infoImportantBullets.bullet2')}</li>
+                <li>• {t('reservations.infoImportantBullets.bullet3')}</li>
+                <li>• {t('reservations.infoImportantBullets.bullet4')}</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

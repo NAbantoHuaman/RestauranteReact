@@ -15,7 +15,7 @@ const translations = {
     nav: {
       home: 'Inicio',
       menu: 'Carta',
-      tables: 'Mesas',
+
       reservations: 'Reservas'
     },
     home: {
@@ -67,6 +67,8 @@ const translations = {
     menu: {
       title: 'Nuestra Carta',
       subtitle: 'Descubre nuestra selección de platos cuidadosamente preparados con ingredientes de primera calidad',
+      categoriesTitle: 'Categorías',
+      categoriesSubtitle: 'Explora nuestras deliciosas opciones por categoría',
       categories: {
         all: 'Todo',
         entradas: 'Entradas',
@@ -122,46 +124,46 @@ const translations = {
         pisco: {
           name: 'Pisco Sour',
           description: 'Cóctel peruano tradicional con pisco acholado'
+        },
+        paella: {
+          name: 'Paella Mixta',
+          description: 'Arroz con mariscos y carnes, azafrán y pimientos asados'
+        },
+        pollo_brasa: {
+          name: 'Pollo a la Brasa',
+          description: 'Clásico peruano con papas, ensalada y salsa huancaína'
+        },
+        pasta_alfredo: {
+          name: 'Pasta Alfredo con Camarones',
+          description: 'Fettuccine cremoso con mantequilla, parmesano y camarones'
+        },
+        chicha: {
+          name: 'Chicha Morada',
+          description: 'Refresco de maíz morado con frutas y especias'
+        },
+        limonada: {
+          name: 'Limonada de Hierbabuena',
+          description: 'Limonada fresca con hierbabuena y hielo'
+        },
+        gin_tonic: {
+          name: 'Gin Tonic Clásico',
+          description: 'Gin premium con tónica, limón y enebro'
+        },
+        suspiro: {
+          name: 'Suspiro a la Limeña',
+          description: 'Manjar blanco con merengue, clásico dulce peruano'
+        },
+        tres_leches: {
+          name: 'Tres Leches',
+          description: 'Bizcocho húmedo con mezcla de tres leches y canela'
+        },
+        helado_artesanal: {
+          name: 'Helado Artesanal',
+          description: 'Selección de sabores artesanales con frutas de estación'
         }
       }
     },
-    tables: {
-      title: 'Gestión de Mesas',
-      updateButton: 'Actualizar Estado',
-      filters: {
-        title: 'Filtros',
-        specificDate: 'Fecha específica:',
-        showAll: 'Mostrar todas las reservas (incluidas pasadas)',
-        clearFilters: 'Limpiar filtros'
-      },
-      locations: {
-        interior: 'Salón Interior',
-        terraza: 'Terraza',
-        patio: 'Patio',
-        privado: 'Salón Privado'
-      },
-      status: {
-        available: 'Disponible',
-        occupied: 'Ocupada',
-        reserved: 'Reservada',
-        unknown: 'Desconocido'
-      },
-      table: 'Mesa',
-      capacity: 'Capacidad',
-      location: 'Ubicación',
-      people: 'personas',
-      reservations: 'Reservas',
-      noReservations: 'Sin reservas',
-      upcoming: 'próximas',
-      forSelectedDate: 'para la fecha seleccionada',
-      summary: {
-        title: 'Resumen de Estado',
-        available: 'Disponibles',
-        occupied: 'Ocupadas',
-        reserved: 'Reservadas',
-        total: 'Total'
-      }
-    },
+
     reservations: {
       title: 'Sistema de Reservas',
       subtitle: 'Gestiona las reservas del restaurante y evita conflictos de horarios',
@@ -173,8 +175,84 @@ const translations = {
       upcomingReservations: 'Próximas Reservas',
       calendar: 'Calendario de Reservas',
       noReservations: 'No hay reservas registradas. Crea tu primera reserva.',
+      createFirstReservation: 'Aún no tienes reservas programadas. ¡Crea tu primera reserva!',
+      prev: 'Anterior',
+      next: 'Siguiente',
+      stepCounter: 'Paso {{current}} de {{total}}',
       table: 'Mesa',
+      consumptionType: 'Tipo de consumo',
       people: 'personas',
+      person: 'persona',
+      confirmDelete: '¿Estás seguro de que deseas eliminar esta reserva?',
+      today: 'Hoy',
+      tomorrow: 'Mañana',
+      notAvailable: 'No disponible',
+      notSelected: 'No seleccionada',
+      date: 'Fecha',
+      time: 'Hora',
+      zone: 'Zona',
+      type: 'Tipo',
+      tablesAvailable: 'mesas disponibles',
+      capacityUpTo: 'Hasta {{count}} personas',
+      choosePeopleTitle: 'Elige la cantidad de personas',
+      childrenNote: '* Bebés y niños deben ser incluidos en la cantidad de personas',
+      adults: 'Adultos',
+      adultsSubtitle: '13 años en adelante',
+      children: 'Niños',
+      childrenSubtitle: '2-12 años',
+      babies: 'Bebés',
+      babiesSubtitle: '0-23 meses',
+      totalPeople: 'Total: {{count}} personas',
+      maxPeoplePerReservation: 'Máximo {{max}} personas por reserva',
+      selectDateTitle: 'Selecciona la fecha',
+      selectDateSubtitle: 'Elige el día para tu reserva',
+      selectedDate: 'Fecha seleccionada',
+      selectTimeTitle: 'Elige el horario',
+      selectTimeSubtitle: 'Selecciona la hora para tu reserva',
+      lunch: 'Almuerzo',
+      dinner: 'Cena',
+      selectedTime: 'Horario seleccionado',
+      chooseZoneTypeTitle: 'Elige zona y tipo de consumo',
+      chooseZoneTypeSubtitle: 'Selecciona el ambiente y el tipo de experiencia que prefieres',
+      restaurantZone: 'Zona del restaurante',
+      availableTablesIn: 'Mesas disponibles en',
+      occupied: 'Ocupada',
+      noTablesAvailableZone: 'No hay mesas disponibles para {{count}} personas en esta zona.',
+      selectAnotherZone: 'Por favor, selecciona otra zona.',
+      consumptionTypeTitle: 'Tipo de consumo',
+      currentSelection: 'Selección actual:',
+      yourDetailsTitle: 'Tus datos',
+      yourDetailsSubtitle: 'Completa la información para confirmar tu reserva',
+      reservationSummaryTitle: 'Resumen de tu reserva',
+      processing: 'Procesando...',
+      successTitle: '¡Reserva Confirmada!',
+      successBody: 'Tu reserva ha sido creada exitosamente. Recibirás un email de confirmación en breve.',
+      successDetailsTitle: 'Detalles de tu reserva:',
+      redirecting: 'Redirigiendo a la página de reservas...',
+      successModal: {
+        title: '¡Reserva Confirmada!',
+        message: 'Tu reserva ha sido creada exitosamente. Recibirás un email de confirmación en breve.',
+        detailsTitle: 'Detalles de tu reserva:',
+        redirecting: 'Redirigiendo a la página de reservas...'
+      },
+      contactLargeGroups: 'Para grupos de más de 8 personas, contacta directamente al restaurante',
+      zones: {
+        terraza: { name: 'Terraza', description: 'Área al aire libre con vista panorámica' },
+        interior: { name: 'Interior', description: 'Ambiente acogedor con aire acondicionado' },
+        privado: { name: 'Salón Privado', description: 'Espacio exclusivo para eventos especiales' },
+        barra: { name: 'Barra', description: 'Área de barra para comidas rápidas' }
+      },
+      consumptionTypes: {
+        almuerzo: { name: 'Almuerzo', description: 'Comida del mediodía' },
+        cena: { name: 'Cena', description: 'Comida de la noche' }
+      },
+      infoImportantTitle: 'Información importante:',
+      infoImportantBullets: {
+        bullet1: 'Recibirás un email de confirmación en los próximos minutos',
+        bullet2: 'Las reservas se confirman sujetas a disponibilidad',
+        bullet3: 'Puedes cancelar o modificar tu reserva hasta 2 horas antes',
+        bullet4: 'Para grupos de más de 8 personas, contacta directamente al restaurante'
+      },
       form: {
         date: 'Fecha',
         time: 'Hora',
@@ -190,13 +268,30 @@ const translations = {
         phone: 'Teléfono',
         phonePlaceholder: '999 888 777',
         cancel: 'Cancelar',
-        createReservation: 'Crear Reserva'
+        createReservation: 'Crear Reserva',
+        specialRequestsLabel: 'Solicitudes especiales (opcional)',
+        specialRequestsPlaceholder: 'Alergias, celebraciones especiales, preferencias de mesa, etc.'
       },
       errors: {
         allFieldsRequired: 'Todos los campos son obligatorios',
         tableNotFound: 'Mesa no encontrada',
         capacityExceeded: 'La mesa {{tableNumber}} solo tiene capacidad para {{capacity}} personas',
-        alreadyReserved: 'Esta mesa ya está reservada para la fecha y hora seleccionadas'
+        alreadyReserved: 'Esta mesa ya está reservada para la fecha y hora seleccionadas',
+        mustSelectAdults: 'Debe seleccionar al menos 1 adulto',
+        mustSelectDate: 'Debe seleccionar una fecha',
+        mustSelectTime: 'Debe seleccionar una hora',
+        mustSelectZone: 'Debe seleccionar una zona',
+        mustSelectTable: 'Debe seleccionar una mesa',
+        mustSelectConsumptionType: 'Debe seleccionar un tipo de consumo',
+        customerNameRequired: 'El nombre es obligatorio',
+        customerNameMinLength: 'El nombre debe tener al menos 2 caracteres',
+        customerEmailRequired: 'El email es obligatorio',
+        invalidEmail: 'Ingresa un email válido',
+        customerPhoneRequired: 'El teléfono es obligatorio',
+        phoneMinLength: 'El teléfono debe tener al menos 8 dígitos',
+        acceptTermsRequired: 'Debe aceptar los términos y condiciones',
+        acceptTermsStart: 'Acepto los ',
+        acceptTermsAnd: ' y la ',
       }
     },
     footer: {
@@ -206,6 +301,7 @@ const translations = {
       follow: 'Síguenos',
       phone: 'Teléfono',
       email: 'Email',
+      emailValue: 'contacto@bellavista.com',
       location: 'Ubicación',
       viewOnMaps: 'Ver en Google Maps',
       hoursTitle: 'HORARIO DE ATENCIÓN',
@@ -226,7 +322,7 @@ const translations = {
     nav: {
       home: 'Home',
       menu: 'Menu',
-      tables: 'Tables',
+
       reservations: 'Reservations'
     },
     home: {
@@ -278,6 +374,8 @@ const translations = {
     menu: {
       title: 'Our Menu',
       subtitle: 'Discover our selection of carefully prepared dishes with premium quality ingredients',
+      categoriesTitle: 'Categories',
+      categoriesSubtitle: 'Explore our delicious options by category',
       categories: {
         all: 'All',
         entradas: 'Appetizers',
@@ -333,46 +431,46 @@ const translations = {
         pisco: {
           name: 'Pisco Sour',
           description: 'Traditional Peruvian cocktail with acholado pisco'
+        },
+        paella: {
+          name: 'Mixed Paella',
+          description: 'Rice with seafood and meats, saffron and roasted peppers'
+        },
+        pollo_brasa: {
+          name: 'Rotisserie Chicken',
+          description: 'Peruvian classic with fries, salad and huancaína sauce'
+        },
+        pasta_alfredo: {
+          name: 'Shrimp Alfredo Pasta',
+          description: 'Creamy fettuccine with butter, parmesan and shrimp'
+        },
+        chicha: {
+          name: 'Chicha Morada',
+          description: 'Purple corn drink with fruit and spices'
+        },
+        limonada: {
+          name: 'Mint Lemonade',
+          description: 'Fresh lemonade with mint and ice'
+        },
+        gin_tonic: {
+          name: 'Classic Gin Tonic',
+          description: 'Premium gin with tonic, lemon and juniper'
+        },
+        suspiro: {
+          name: 'Suspiro Limeño',
+          description: 'Peruvian dessert with dulce de leche and meringue'
+        },
+        tres_leches: {
+          name: 'Tres Leches Cake',
+          description: 'Moist sponge cake soaked in three milks and cinnamon'
+        },
+        helado_artesanal: {
+          name: 'Artisanal Ice Cream',
+          description: 'Selection of artisanal flavors with seasonal fruits'
         }
       }
     },
-    tables: {
-      title: 'Table Management',
-      updateButton: 'Update Status',
-      filters: {
-        title: 'Filters',
-        specificDate: 'Specific date:',
-        showAll: 'Show all reservations (including past)',
-        clearFilters: 'Clear filters'
-      },
-      locations: {
-        interior: 'Interior Hall',
-        terraza: 'Terrace',
-        patio: 'Patio',
-        privado: 'Private Hall'
-      },
-      status: {
-        available: 'Available',
-        occupied: 'Occupied',
-        reserved: 'Reserved',
-        unknown: 'Unknown'
-      },
-      table: 'Table',
-      capacity: 'Capacity',
-      location: 'Location',
-      people: 'people',
-      reservations: 'Reservations',
-      noReservations: 'No reservations',
-      upcoming: 'upcoming',
-      forSelectedDate: 'for selected date',
-      summary: {
-        title: 'Status Summary',
-        available: 'Available',
-        occupied: 'Occupied',
-        reserved: 'Reserved',
-        total: 'Total'
-      }
-    },
+
     reservations: {
       title: 'Reservation System',
       subtitle: 'Manage restaurant reservations and avoid scheduling conflicts',
@@ -384,9 +482,85 @@ const translations = {
       upcomingReservations: 'Upcoming Reservations',
       calendar: 'Reservation Calendar',
       noReservations: 'No reservations registered. Create your first reservation.',
+      createFirstReservation: 'You have no scheduled reservations yet. Create your first one!',
+      prev: 'Previous',
+      next: 'Next',
+      stepCounter: 'Step {{current}} of {{total}}',
       table: 'Table',
+      consumptionType: 'Consumption Type',
       people: 'people',
-      form: {
+        person: 'person',
+         confirmDelete: 'Are you sure you want to delete this reservation?',
+        today: 'Today',
+        tomorrow: 'Tomorrow',
+        notAvailable: 'Not available',
+        notSelected: 'Not selected',
+        date: 'Date',
+        time: 'Time',
+        zone: 'Zone',
+        type: 'Type',
+        tablesAvailable: 'tables available',
+        capacityUpTo: 'Up to {{count}} people',
+        choosePeopleTitle: 'Choose number of people',
+        childrenNote: '* Babies and children must be included in the headcount',
+        adults: 'Adults',
+        adultsSubtitle: 'Age 13+',
+        children: 'Children',
+        childrenSubtitle: 'Age 2–12',
+        babies: 'Babies',
+        babiesSubtitle: '0–23 months',
+        totalPeople: 'Total: {{count}} people',
+        maxPeoplePerReservation: 'Maximum {{max}} people per reservation',
+        selectDateTitle: 'Select the date',
+        selectDateSubtitle: 'Pick a day for your reservation',
+        selectedDate: 'Selected date',
+        selectTimeTitle: 'Choose a time',
+        selectTimeSubtitle: 'Select a time for your reservation',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        selectedTime: 'Selected time',
+        chooseZoneTypeTitle: 'Choose zone and consumption type',
+        chooseZoneTypeSubtitle: 'Pick the area and experience type you prefer',
+        restaurantZone: 'Restaurant zone',
+        availableTablesIn: 'Available tables in',
+        occupied: 'Occupied',
+        noTablesAvailableZone: 'No tables available for {{count}} people in this zone.',
+        selectAnotherZone: 'Please select another zone.',
+        consumptionTypeTitle: 'Consumption type',
+        currentSelection: 'Current selection:',
+        yourDetailsTitle: 'Your details',
+        yourDetailsSubtitle: 'Complete your information to confirm your reservation',
+        reservationSummaryTitle: 'Your reservation summary',
+        processing: 'Processing...',
+        successTitle: 'Reservation Confirmed!',
+        successBody: 'Your reservation has been created successfully. You will receive a confirmation email shortly.',
+        successDetailsTitle: 'Your reservation details:',
+        redirecting: 'Redirecting to the reservations page...',
+        successModal: {
+          title: 'Reservation Confirmed!',
+          message: 'Your reservation has been created successfully. You will receive a confirmation email shortly.',
+          detailsTitle: 'Your reservation details:',
+          redirecting: 'Redirecting to the reservations page...'
+        },
+        contactLargeGroups: 'For groups larger than 8, please contact the restaurant directly',
+      zones: {
+        terraza: { name: 'Terrace', description: 'Outdoor area with panoramic view' },
+        interior: { name: 'Indoor', description: 'Cozy environment with air conditioning' },
+        privado: { name: 'Private Room', description: 'Exclusive space for special events' },
+        barra: { name: 'Bar', description: 'Bar area for quick meals' }
+      },
+      consumptionTypes: {
+        almuerzo: { name: 'Lunch', description: 'Midday meal' },
+        cena: { name: 'Dinner', description: 'Evening meal' }
+      },
+      infoImportantTitle: 'Important information:',
+      infoImportantBullets: {
+        bullet1: 'You will receive a confirmation email in the next few minutes',
+        bullet2: 'Reservations are confirmed subject to availability',
+        bullet3: 'You can cancel or modify your reservation up to 2 hours before',
+        bullet4: 'For groups larger than 8, please contact the restaurant directly'
+      },
+       form: {
         date: 'Date',
         time: 'Time',
         selectTime: 'Select time',
@@ -401,13 +575,30 @@ const translations = {
         phone: 'Phone',
         phonePlaceholder: '999 888 777',
         cancel: 'Cancel',
-        createReservation: 'Create Reservation'
+        createReservation: 'Create Reservation',
+        specialRequestsLabel: 'Special requests (optional)',
+        specialRequestsPlaceholder: 'Allergies, special occasions, table preferences, etc.'
       },
       errors: {
         allFieldsRequired: 'All fields are required',
         tableNotFound: 'Table not found',
         capacityExceeded: 'Table {{tableNumber}} only has capacity for {{capacity}} people',
-        alreadyReserved: 'This table is already reserved for the selected date and time'
+        alreadyReserved: 'This table is already reserved for the selected date and time',
+        mustSelectAdults: 'At least 1 adult must be selected',
+        mustSelectDate: 'You must select a date',
+        mustSelectTime: 'You must select a time',
+        mustSelectZone: 'You must select a zone',
+        mustSelectTable: 'You must select a table',
+        mustSelectConsumptionType: 'You must select a consumption type',
+        customerNameRequired: 'Name is required',
+        customerNameMinLength: 'Name must be at least 2 characters',
+        customerEmailRequired: 'Email is required',
+        invalidEmail: 'Please enter a valid email',
+        customerPhoneRequired: 'Phone is required',
+        phoneMinLength: 'Phone must be at least 8 digits',
+        acceptTermsRequired: 'You must accept the terms and conditions',
+        acceptTermsStart: 'I accept the ',
+        acceptTermsAnd: ' and the ',
       }
     },
     footer: {
@@ -417,6 +608,7 @@ const translations = {
       follow: 'Follow Us',
       phone: 'Phone',
       email: 'Email',
+      emailValue: 'contact@bellavista.com',
       location: 'Location',
       viewOnMaps: 'View on Google Maps',
       hoursTitle: 'OPENING HOURS',
@@ -450,12 +642,11 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
-        return key; // Return the key if translation not found
+        return key; 
       }
     }
     
     if (typeof value === 'string' && variables) {
-      // Replace variables in the format {{variableName}}
       return value.replace(/\{\{(\w+)\}\}/g, (match, variableName) => {
         return variables[variableName] !== undefined ? String(variables[variableName]) : match;
       });

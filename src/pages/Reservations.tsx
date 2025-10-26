@@ -3,7 +3,11 @@ import { Calendar, Clock, Users, MapPin, Phone, Mail, User, Plus, Trash2, AlertC
 import { Link } from 'react-router-dom';
 import { useTablesManager } from '../hooks/useTablesManager';
 import { useLanguage } from '../contexts/LanguageContext';
+import { formatTimeLabel } from '../utils/dateTime';
 import PersonSelector from '../components/PersonSelector';
+import ReservationQRCode from '../components/ReservationQRCode';
+// import { createReservationICS, downloadICS } from '../utils/ics';
+import { createReservationReceiptHTML, downloadReceipt } from '../utils/receipt';
 
 interface Table {
   id: number;
@@ -38,10 +42,17 @@ export default function Reservations() {
     isTableAvailableForDateTime
   } = useTablesManager();
   
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const locale = language === 'en' ? 'en-US' : 'es-PE';
   
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState('');
+  const [filteredReservations, setFilteredReservations] = useState<Reservation[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showWizard, setShowWizard] = useState(false);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [formData, setFormData] = useState({
     tableId: '',
     customerName: '',
@@ -54,12 +65,12 @@ export default function Reservations() {
     children: 0,
     babies: 0,
   });
+  const [showQRId, setShowQRId] = useState<number | null>(null);
 
-  // Actualizar datos cada 30 segundos para mostrar información en tiempo real
   useEffect(() => {
     const interval = setInterval(() => {
       refreshReservations();
-    }, 30000); // 30 segundos
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [refreshReservations]);
@@ -139,6 +150,12 @@ export default function Reservations() {
     removeReservation(id);
   };
 
+  const handleDeleteReservation = (id: number) => {
+    if (window.confirm(t('reservations.confirmDelete'))) {
+      removeReservation(id);
+    }
+  };
+
   const openModal = () => {
     setFormData({
       tableId: '',
@@ -174,25 +191,98 @@ export default function Reservations() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('es-PE', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+     const date = new Date(dateString + 'T00:00:00');
+     return date.toLocaleDateString(locale, {
+       weekday: 'long',
+       year: 'numeric',
+       month: 'long',
+       day: 'numeric',
+     });
+   };
+
+  const isTimeAvailable = (date: string, time: string, excludeReservationId?: number) => {
+    return !reservations.some(reservation => 
+      reservation.date === date && 
+      reservation.time === time && 
+      reservation.status === 'confirmed' &&
+      reservation.id !== excludeReservationId
+    );
   };
 
-  // Función para verificar si un horario está disponible
-  const isTimeSlotAvailable = (time: string) => {
-    if (!formData.date) return true; // Si no hay fecha, mostrar todos disponibles
-    
-    // Verificar si hay al menos una mesa disponible para esta fecha y hora
-    const availableTablesForTime = tables.filter(table => 
-      isTableAvailableForDateTime(table.id, formData.date, time)
+  const isTimeSlotAvailable = (date: string, time: string) => {
+    return !reservations.some(reservation => 
+      reservation.date === date && 
+      reservation.time === time && 
+      reservation.status === 'confirmed'
     );
-    
-    return availableTablesForTime.length > 0;
+  };
+
+  // Update: use receipt with QR inside
+  const handleDownloadReceipt = (reservation: any) => {
+    const language = localStorage.getItem("language") || "es";
+    const labels = {
+      title: language === "en" ? "Reservation Receipt" : "Boleta de Reserva",
+      date: language === "en" ? "Date" : "Fecha",
+      time: language === "en" ? "Time" : "Hora",
+      customer: language === "en" ? "Customer" : "Cliente",
+      guests: language === "en" ? "Guests" : "Comensales",
+      table: language === "en" ? "Table" : "Mesa",
+      zone: language === "en" ? "Zone" : "Zona",
+      consumption: language === "en" ? "Consumption" : "Consumo",
+      phone: language === "en" ? "Phone" : "Teléfono",
+      email: language === "en" ? "Email" : "Correo",
+      notes: language === "en" ? "Notes" : "Notas",
+      location: language === "en" ? "Location" : "Ubicación",
+      qr: language === "en" ? "QR Code" : "Código QR",
+    };
+
+    const dateStr = reservation.date;
+    const timeStr = reservation.time;
+    const tableLabel = `${labels.table} ${reservation.tableNumber ?? reservation.table ?? ""}`;
+    const zoneLabel = reservation.zone ?? reservation.zoneLabel ?? undefined;
+    const consumptionTypeLabel = reservation.consumptionType ?? reservation.consumptionTypeLabel ?? undefined;
+    const location = `${t('footer.restaurantName')}, ${t('home.info.address.value')}`;
+
+    // Build QR payload from reservation data
+    const qrPayloadObj = {
+      type: "reservation",
+      date: dateStr,
+      time: timeStr,
+      customer: reservation.customerName ?? reservation.name ?? "",
+      guests: reservation.guests ?? reservation.numberOfGuests ?? 0,
+      table: reservation.tableNumber ?? reservation.table ?? "",
+      zone: zoneLabel ?? "",
+    };
+
+    // Encode payload in base64 and build a URL to the reservation-view page
+    const payloadBase64 = btoa(JSON.stringify(qrPayloadObj));
+    const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+    const qrUrl = `${baseUrl}/reservation-view?data=${encodeURIComponent(payloadBase64)}`;
+
+    const html = createReservationReceiptHTML(
+      {
+        date: dateStr,
+        time: timeStr,
+        customerName: reservation.customerName ?? reservation.name ?? "",
+        guests: reservation.guests ?? reservation.numberOfGuests ?? 0,
+        tableLabel,
+        zoneLabel,
+        consumptionTypeLabel,
+        phone: reservation.phone ?? reservation.phoneNumber ?? "",
+        email: reservation.email ?? "",
+        specialRequests: reservation.specialRequests ?? reservation.notes ?? "",
+        location,
+        qrUrl,
+      },
+      labels
+    );
+
+    const fileName = `${labels.title.replace(/\s+/g, "_")}_${dateStr}_${timeStr}_${reservation.tableNumber ?? reservation.table ?? ""}.html`;
+    downloadReceipt(fileName, html);
+  };
+
+  const toggleQRFor = (id: number) => {
+    setShowQRId(prev => (prev === id ? null : id));
   };
 
   const sortedReservations = [...reservations].sort((a, b) => {
@@ -204,6 +294,8 @@ export default function Reservations() {
   const availableTables = formData.date && formData.time 
     ? getAvailableTablesForDateTime(formData.date, formData.time, formData.adults + formData.children + formData.babies)
     : tables;
+
+  // Usar util compartido formatTimeLabel(language, time) importado desde ../utils/dateTime
 
   return (
     <div className="min-h-screen py-6 sm:py-12 pt-16 sm:pt-20 bg-gradient-to-br from-amber-50 via-orange-50/30 to-neutral-50">
@@ -245,68 +337,7 @@ export default function Reservations() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-3 sm:grid-cols-1 md:grid-cols-3 gap-3 sm:gap-8 mb-6 sm:mb-12">
-          <div className="group relative bg-white p-3 sm:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-blue-100 hover:border-blue-200 transform hover:-translate-y-2">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-blue-100/30 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <div className="w-8 h-8 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                  <Calendar className="h-4 w-4 sm:h-8 sm:w-8 text-white" />
-                </div>
-                <div className="text-right">
-                  <p className="text-lg sm:text-4xl font-bold text-blue-600 mb-1">{reservations.length}</p>
-                  <div className="w-6 sm:w-12 h-1 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full ml-auto"></div>
-                </div>
-              </div>
-              <h3 className="text-xs sm:text-lg font-semibold text-neutral-800 mb-1 sm:mb-2">{t('reservations.totalReservations')}</h3>
-              <p className="text-neutral-600 text-xs sm:text-sm hidden sm:block">Reservas registradas en el sistema</p>
-            </div>
-          </div>
 
-          <div className="group relative bg-white p-3 sm:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-green-100 hover:border-green-200 transform hover:-translate-y-2">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-green-100/30 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <div className="w-8 h-8 sm:w-16 sm:h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                  <svg className="h-4 w-4 sm:h-8 sm:w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg sm:text-4xl font-bold text-green-600 mb-1">{tables.filter(t => t.status === 'available').length}</p>
-                  <div className="w-6 sm:w-12 h-1 bg-gradient-to-r from-green-400 to-green-600 rounded-full ml-auto"></div>
-                </div>
-              </div>
-              <h3 className="text-xs sm:text-lg font-semibold text-neutral-800 mb-1 sm:mb-2">{t('reservations.availableTables')}</h3>
-              <p className="text-neutral-600 text-xs sm:text-sm hidden sm:block">Mesas disponibles ahora</p>
-            </div>
-          </div>
-
-          <div className="group relative bg-white p-3 sm:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-amber-100 hover:border-amber-200 transform hover:-translate-y-2">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-amber-100/30 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2 sm:mb-4">
-                <div className="w-8 h-8 sm:w-16 sm:h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                  <Clock className="h-4 w-4 sm:h-8 sm:w-8 text-white" />
-                </div>
-                <div className="text-right">
-                  <p className="text-lg sm:text-4xl font-bold text-amber-600 mb-1">
-                    {
-                      reservations.filter((res) => {
-                        const resDate = new Date(res.date + 'T' + res.time);
-                        return resDate >= new Date();
-                      }).length
-                    }
-                  </p>
-                  <div className="w-6 sm:w-12 h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full ml-auto"></div>
-                </div>
-              </div>
-              <h3 className="text-xs sm:text-lg font-semibold text-neutral-800 mb-1 sm:mb-2">{t('reservations.upcomingReservations')}</h3>
-              <p className="text-neutral-600 text-xs sm:text-sm hidden sm:block">Próximas reservas confirmadas</p>
-            </div>
-          </div>
-        </div>
 
         {/* Reservations Section */}
         <div className="bg-white rounded-3xl shadow-2xl p-3 sm:p-8 border border-neutral-100">
@@ -327,17 +358,10 @@ export default function Reservations() {
               <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-amber-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
                 <Calendar className="h-8 w-8 sm:h-12 sm:w-12 text-amber-600" />
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-neutral-800 mb-2 sm:mb-4">No hay reservas</h3>
-              <p className="text-sm sm:text-lg text-neutral-600 mb-6 sm:mb-8 max-w-md mx-auto">
-                Aún no tienes reservas programadas. ¡Crea tu primera reserva!
-              </p>
-              <button
-                onClick={openModal}
-                className="inline-flex items-center px-6 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                Nueva Reserva
-              </button>
+              <h3 className="text-lg sm:text-2xl font-bold text-neutral-800 mb-2 sm:mb-4">{t('reservations.noReservations')}</h3>
+<p className="text-sm sm:text-lg text-neutral-600 mb-6 sm:mb-8 max-w-md mx-auto">
+  {t('reservations.createFirstReservation')}
+</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -360,7 +384,7 @@ export default function Reservations() {
                         </h3>
                         <p className="text-neutral-600 flex items-center text-sm sm:text-base mt-1">
                           <Users className="h-4 w-4 mr-1 flex-shrink-0" />
-                          {reservation.guests} {reservation.guests === 1 ? 'persona' : 'personas'}
+                          {reservation.guests} {reservation.guests === 1 ? t('reservations.person') : t('reservations.people')}
                         </p>
                       </div>
                       <button
@@ -376,7 +400,7 @@ export default function Reservations() {
                         <div className="flex items-center text-neutral-600">
                           <Calendar className="h-4 w-4 mr-2 text-amber-500 flex-shrink-0" />
                           <span className="hidden sm:inline">
-                            {new Date(reservation.date).toLocaleDateString('es-ES', {
+                            {new Date(reservation.date).toLocaleDateString(locale, {
                               weekday: 'long',
                               year: 'numeric',
                               month: 'long',
@@ -384,7 +408,7 @@ export default function Reservations() {
                             })}
                           </span>
                           <span className="sm:hidden">
-                            {new Date(reservation.date).toLocaleDateString('es-ES', {
+                            {new Date(reservation.date).toLocaleDateString(locale, {
                               day: 'numeric',
                               month: 'short',
                               year: '2-digit'
@@ -393,7 +417,7 @@ export default function Reservations() {
                         </div>
                         <div className="flex items-center text-neutral-600">
                           <Clock className="h-4 w-4 mr-1 text-amber-500 flex-shrink-0" />
-                          <span className="font-medium">{reservation.time}</span>
+                          <span className="font-medium">{formatTimeLabel(language, reservation.time)}</span>
                         </div>
                       </div>
                       
@@ -404,11 +428,42 @@ export default function Reservations() {
                           <span className="sm:hidden">{reservation.customerPhone.slice(-4)}</span>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs text-neutral-500">Mesa</p>
+                          <p className="text-xs text-neutral-500">{t('reservations.table')}</p>
                           <p className="text-lg font-bold text-amber-600">#{reservation.tableNumber}</p>
                         </div>
                       </div>
                     </div>
+
+                    {/* Action buttons: Receipt and QR */}
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDownloadReceipt(reservation)}
+                          className="px-3 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors text-xs sm:text-sm"
+                        >
+                          {language === 'en' ? 'Download receipt' : 'Descargar boleta'}
+                        </button>
+                        <button
+                          onClick={() => toggleQRFor(reservation.id)}
+                          className="px-3 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors text-xs sm:text-sm"
+                        >
+                          {showQRId === reservation.id ? (language === 'en' ? 'Hide QR' : 'Ocultar QR') : (language === 'en' ? 'Show QR' : 'Ver QR')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showQRId === reservation.id && (
+                      <div className="mt-3">
+                        <ReservationQRCode
+                          data={{
+                            date: reservation.date,
+                            time: reservation.time,
+                            customerName: reservation.customerName,
+                            table: reservation.tableNumber
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -452,44 +507,44 @@ export default function Reservations() {
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                       <option value="">{t('reservations.form.selectTime')}</option>
-                      <option value="12:00" disabled={!isTimeSlotAvailable('12:00')}>
-                        12:00 PM {!isTimeSlotAvailable('12:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="12:00" disabled={!isTimeSlotAvailable(formData.date, '12:00')}>
+                        {formatTimeLabel(language, '12:00')} {!isTimeSlotAvailable(formData.date, '12:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="12:30" disabled={!isTimeSlotAvailable('12:30')}>
-                        12:30 PM {!isTimeSlotAvailable('12:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="12:30" disabled={!isTimeSlotAvailable(formData.date, '12:30')}>
+                        {formatTimeLabel(language, '12:30')} {!isTimeSlotAvailable(formData.date, '12:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="13:00" disabled={!isTimeSlotAvailable('13:00')}>
-                        1:00 PM {!isTimeSlotAvailable('13:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="13:00" disabled={!isTimeSlotAvailable(formData.date, '13:00')}>
+                        {formatTimeLabel(language, '13:00')} {!isTimeSlotAvailable(formData.date, '13:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="13:30" disabled={!isTimeSlotAvailable('13:30')}>
-                        1:30 PM {!isTimeSlotAvailable('13:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="13:30" disabled={!isTimeSlotAvailable(formData.date, '13:30')}>
+                        {formatTimeLabel(language, '13:30')} {!isTimeSlotAvailable(formData.date, '13:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="14:00" disabled={!isTimeSlotAvailable('14:00')}>
-                        2:00 PM {!isTimeSlotAvailable('14:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="14:00" disabled={!isTimeSlotAvailable(formData.date, '14:00')}>
+                        {formatTimeLabel(language, '14:00')} {!isTimeSlotAvailable(formData.date, '14:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="14:30" disabled={!isTimeSlotAvailable('14:30')}>
-                        2:30 PM {!isTimeSlotAvailable('14:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="14:30" disabled={!isTimeSlotAvailable(formData.date, '14:30')}>
+                        {formatTimeLabel(language, '14:30')} {!isTimeSlotAvailable(formData.date, '14:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="19:00" disabled={!isTimeSlotAvailable('19:00')}>
-                        7:00 PM {!isTimeSlotAvailable('19:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="19:00" disabled={!isTimeSlotAvailable(formData.date, '19:00')}>
+                        {formatTimeLabel(language, '19:00')} {!isTimeSlotAvailable(formData.date, '19:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="19:30" disabled={!isTimeSlotAvailable('19:30')}>
-                        7:30 PM {!isTimeSlotAvailable('19:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="19:30" disabled={!isTimeSlotAvailable(formData.date, '19:30')}>
+                        {formatTimeLabel(language, '19:30')} {!isTimeSlotAvailable(formData.date, '19:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="20:00" disabled={!isTimeSlotAvailable('20:00')}>
-                        8:00 PM {!isTimeSlotAvailable('20:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="20:00" disabled={!isTimeSlotAvailable(formData.date, '20:00')}>
+                        {formatTimeLabel(language, '20:00')} {!isTimeSlotAvailable(formData.date, '20:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="20:30" disabled={!isTimeSlotAvailable('20:30')}>
-                        8:30 PM {!isTimeSlotAvailable('20:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="20:30" disabled={!isTimeSlotAvailable(formData.date, '20:30')}>
+                        {formatTimeLabel(language, '20:30')} {!isTimeSlotAvailable(formData.date, '20:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="21:00" disabled={!isTimeSlotAvailable('21:00')}>
-                        9:00 PM {!isTimeSlotAvailable('21:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="21:00" disabled={!isTimeSlotAvailable(formData.date, '21:00')}>
+                        {formatTimeLabel(language, '21:00')} {!isTimeSlotAvailable(formData.date, '21:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="21:30" disabled={!isTimeSlotAvailable('21:30')}>
-                        9:30 PM {!isTimeSlotAvailable('21:30') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="21:30" disabled={!isTimeSlotAvailable(formData.date, '21:30')}>
+                        {formatTimeLabel(language, '21:30')} {!isTimeSlotAvailable(formData.date, '21:30') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
-                      <option value="22:00" disabled={!isTimeSlotAvailable('22:00')}>
-                        10:00 PM {!isTimeSlotAvailable('22:00') ? `(${t('reservations.form.notAvailable')})` : ''}
+                      <option value="22:00" disabled={!isTimeSlotAvailable(formData.date, '22:00')}>
+                        {formatTimeLabel(language, '22:00')} {!isTimeSlotAvailable(formData.date, '22:00') ? `(${t('reservations.form.notAvailable')})` : ''}
                       </option>
                     </select>
                   </div>

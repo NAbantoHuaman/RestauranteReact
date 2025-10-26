@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface PersonSelectorProps {
   adults: number;
@@ -21,6 +22,7 @@ export default function PersonSelector({
   maxTotal = 8
 }: PersonSelectorProps) {
   const totalGuests = adults + children + babies;
+  const { t } = useLanguage();
 
   const handleIncrement = (type: 'adults' | 'children' | 'babies') => {
     if (totalGuests >= maxTotal) return;
@@ -97,10 +99,10 @@ export default function PersonSelector({
     <div className="bg-white border border-neutral-200 rounded-lg p-4">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-neutral-900 mb-1">
-          Elija la cantidad de personas
+          {t('reservations.choosePeopleTitle')}
         </h2>
         <p className="text-sm text-neutral-500">
-          * Bebés y niños deben ser incluidos en la cantidad de personas.
+          {t('reservations.childrenNote')}
         </p>
       </div>
 
@@ -108,31 +110,30 @@ export default function PersonSelector({
         <CounterButton
           type="adults"
           count={adults}
-          label="Adultos"
-          description="Mayores de 12 años"
+          label={t('reservations.adults')}
+          description={t('reservations.adultsSubtitle')}
         />
         <CounterButton
           type="children"
           count={children}
-          label="Niños"
-          description="De 2 a 12 años"
+          label={t('reservations.children')}
+          description={t('reservations.childrenSubtitle')}
         />
         <CounterButton
           type="babies"
           count={babies}
-          label="Bebés"
-          description="Menores de 2 años"
+          label={t('reservations.babies')}
+          description={t('reservations.babiesSubtitle')}
         />
       </div>
 
       <div className="mt-4 pt-4 border-t border-neutral-100">
         <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-neutral-700">Total de personas:</span>
-          <span className="text-lg font-bold text-amber-600">{totalGuests}</span>
+          <span className="text-sm font-medium text-neutral-700">{t('reservations.totalPeople', { count: totalGuests })}</span>
         </div>
         {totalGuests >= maxTotal && (
           <p className="text-xs text-red-500 mt-1">
-            Máximo {maxTotal} personas por reserva
+            {t('reservations.maxPeoplePerReservation', { max: maxTotal })}
           </p>
         )}
       </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSelector from './LanguageSelector';
 
-type Page = 'home' | 'menu' | 'tables' | 'reservations';
+type Page = 'home' | 'menu' | 'reservations';
 
 interface HeaderProps {
   currentPage: Page;
@@ -27,7 +27,7 @@ export default function Header({ currentPage }: HeaderProps) {
   const navItems = [
     { id: 'home' as Page, label: t('nav.home'), icon: Home, path: '/' },
     { id: 'menu' as Page, label: t('nav.menu'), icon: Utensils, path: '/menu' },
-    { id: 'tables' as Page, label: t('nav.tables'), icon: Menu, path: '/tables' },
+
     { id: 'reservations' as Page, label: t('nav.reservations'), icon: Calendar, path: '/reservations' },
   ];
 

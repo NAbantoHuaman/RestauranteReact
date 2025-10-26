@@ -5,7 +5,7 @@ export interface Table {
   number: number;
   capacity: number;
   status: 'available' | 'occupied' | 'reserved';
-  location: 'interior' | 'patio' | 'terraza' | 'privado';
+  location: 'interior' | 'barra' | 'terraza' | 'privado';
 }
 
 export interface Reservation {
@@ -15,267 +15,273 @@ export interface Reservation {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  date: string;
-  time: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
   guests: number;
   adults: number;
   children: number;
   babies: number;
+  status: 'confirmed';
   zone?: string;
-  table?: string;
+  table?: string; // wizard table id like T1, I1, etc.
   consumptionType?: string;
   specialRequests?: string;
 }
 
-// Configuración inicial de mesas
 const INITIAL_TABLES: Table[] = [
   { id: 1, number: 1, capacity: 2, status: 'available', location: 'interior' },
   { id: 2, number: 2, capacity: 4, status: 'available', location: 'interior' },
-  { id: 3, number: 3, capacity: 4, status: 'available', location: 'patio' },
-  { id: 4, number: 4, capacity: 6, status: 'available', location: 'patio' },
-  { id: 5, number: 5, capacity: 8, status: 'available', location: 'terraza' },
-  { id: 6, number: 6, capacity: 2, status: 'available', location: 'terraza' },
-  { id: 7, number: 7, capacity: 4, status: 'available', location: 'privado' },
-  { id: 8, number: 8, capacity: 6, status: 'available', location: 'privado' },
-  { id: 9, number: 9, capacity: 10, status: 'available', location: 'privado' },
-  { id: 10, number: 10, capacity: 12, status: 'available', location: 'privado' },
+  { id: 3, number: 3, capacity: 6, status: 'available', location: 'barra' },
+  { id: 4, number: 4, capacity: 2, status: 'available', location: 'barra' },
+  { id: 5, number: 5, capacity: 4, status: 'available', location: 'terraza' },
+  { id: 6, number: 6, capacity: 6, status: 'available', location: 'terraza' },
+  { id: 7, number: 7, capacity: 8, status: 'available', location: 'interior' },
+  { id: 8, number: 8, capacity: 2, status: 'available', location: 'interior' },
+  { id: 9, number: 9, capacity: 4, status: 'available', location: 'privado' },
+  { id: 10, number: 10, capacity: 6, status: 'available', location: 'privado' }
 ];
 
-// Mapeo de zonas del wizard a ubicaciones de mesas
-const ZONE_TO_LOCATION_MAP: Record<string, string> = {
-  'terraza': 'terraza',
-  'interior': 'interior',
-  'privado': 'privado',
-  'patio': 'patio'
+const ZONE_TO_LOCATION_MAP: Record<string, Table['location']> = {
+  terraza: 'terraza',
+  interior: 'interior',
+  privado: 'privado',
+  barra: 'barra',
 };
 
-// Mapeo de IDs de mesas del wizard a IDs reales
 const WIZARD_TABLE_TO_REAL_TABLE: Record<string, number> = {
-  // Terraza
-  'T1': 5,
-  'T2': 6,
-  // Interior
-  'I1': 1,
-  'I2': 2,
-  'I3': 7,  // Mesa 7 (interior/privado)
-  'I4': 8,  // Mesa 8 (interior/privado)
-  'I5': 1,  // Volver a mesa 1 si es necesario
-  // Privado
-  'P1': 9,
-  'P2': 10,
-  // Patio
-  'PT1': 3,
-  'PT2': 4,
+  T1: 5,
+  T2: 6,
+  I1: 1,
+  I2: 2,
+  I3: 7,
+  I4: 8,
+  P1: 9,
+  P2: 10,
+  PT1: 3, // backward compatibility (old "patio")
+  PT2: 4, // backward compatibility (old "patio")
+  B1: 3,
+  B2: 4,
 };
+
+// Inverso para obtener el wizardId a partir del real tableId
+const REAL_TO_WIZARD_TABLE: Record<number, string> = Object.entries(WIZARD_TABLE_TO_REAL_TABLE).reduce(
+  (acc, [wizId, realId]) => {
+    acc[realId] = wizId;
+    return acc;
+  },
+  {} as Record<number, string>
+);
+
+const STORAGE = {
+  tables: 'tables',
+  reservations: 'reservations',
+};
+
+function safeParse<T>(value: string | null, fallback: T): T {
+  try {
+    return value ? (JSON.parse(value) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function initializeTables(): Table[] {
+  const stored = localStorage.getItem(STORAGE.tables);
+  const tablesRaw = stored ? safeParse<Table[]>(stored, INITIAL_TABLES) : INITIAL_TABLES;
+  // migrate any legacy location 'patio' -> 'barra'
+  const tables = tablesRaw.map((t) => ((t as any).location === 'patio' ? { ...t, location: 'barra' } : t));
+  localStorage.setItem(STORAGE.tables, JSON.stringify(tables));
+  return tables;
+}
+
+function getStoredReservations(): Reservation[] {
+  return safeParse<Reservation[]>(localStorage.getItem(STORAGE.reservations), []);
+}
+
+function minutesBetween(dateA: Date, dateB: Date) {
+  return Math.abs(dateA.getTime() - dateB.getTime()) / (1000 * 60);
+}
 
 export function useTablesManager() {
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
   const updateTablesStatus = useCallback((baseTables: Table[], currentReservations: Reservation[]): Table[] => {
-    const currentDate = new Date();
-    const today = currentDate.toISOString().split('T')[0];
-    const currentTime = currentDate.toTimeString().slice(0, 5);
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const currentTimeStr = now.toTimeString().slice(0, 5); // HH:mm
 
-    return baseTables.map(table => {
-      // Buscar reservas para esta mesa
-      const tableReservations = currentReservations.filter(res => res.tableId === table.id);
-      
-      // Verificar si hay reserva activa (hoy y en horario actual o futuro)
-      const hasActiveReservation = tableReservations.some(res => {
-        const resDate = res.date;
-        const resTime = res.time;
-        
-        if (resDate === today) {
-          return resTime >= currentTime;
-        } else if (resDate > today) {
-          return true;
-        }
-        return false;
+    return baseTables.map((table) => {
+      const tableReservations = currentReservations.filter((r) => r.tableId === table.id);
+
+      const hasCurrentReservation = tableReservations.some((r) => {
+        if (r.date !== todayStr) return false;
+        const resDateTime = new Date(`${r.date}T${r.time}`);
+        const diff = minutesBetween(resDateTime, now);
+        return diff >= 0 && diff <= 120; // occupied within 2 hours window
       });
 
-      // Verificar si hay reserva para hoy en horario pasado (mesa ocupada)
-      const hasCurrentReservation = tableReservations.some(res => {
-        const resDate = res.date;
-        const resTime = res.time;
-        
-        if (resDate === today) {
-          const resDateTime = new Date(`${resDate}T${resTime}`);
-          const currentDateTime = new Date();
-          const timeDiff = (currentDateTime.getTime() - resDateTime.getTime()) / (1000 * 60);
-          
-          // Si la reserva fue hace menos de 2 horas, considerar mesa ocupada
-          return timeDiff >= 0 && timeDiff <= 120;
+      const hasUpcomingTodayOrFuture = tableReservations.some((r) => {
+        if (r.date === todayStr) {
+          return r.time >= currentTimeStr; // later today
         }
-        return false;
+        return r.date > todayStr; // future date
       });
 
-      if (hasCurrentReservation) {
-        return { ...table, status: 'occupied' as const };
-      } else if (hasActiveReservation) {
-        return { ...table, status: 'reserved' as const };
-      } else {
-        return { ...table, status: 'available' as const };
-      }
+      if (hasCurrentReservation) return { ...table, status: 'occupied' };
+      if (hasUpcomingTodayOrFuture) return { ...table, status: 'reserved' };
+      return { ...table, status: 'available' };
     });
   }, []);
 
   const loadTablesAndReservations = useCallback(() => {
-    // Cargar reservas del localStorage
-    const storedReservations = localStorage.getItem('reservations');
-    const loadedReservations: Reservation[] = storedReservations ? JSON.parse(storedReservations) : [];
+    const loadedReservations = getStoredReservations();
+    const baseTables = initializeTables();
+    const updatedTables = updateTablesStatus(baseTables, loadedReservations);
+
     setReservations(loadedReservations);
-
-    // Actualizar estado de mesas basado en reservas
-    const updatedTables = updateTablesStatus(INITIAL_TABLES, loadedReservations);
     setTables(updatedTables);
-
-    // Guardar mesas actualizadas
-    localStorage.setItem('tables', JSON.stringify(updatedTables));
   }, [updateTablesStatus]);
 
-  // Cargar datos iniciales
   useEffect(() => {
     loadTablesAndReservations();
   }, [loadTablesAndReservations]);
 
-  // Escuchar cambios en localStorage para sincronizar entre páginas
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'reservations' || e.key === 'tables') {
-        loadTablesAndReservations();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE.tables) {
+        setTables(initializeTables());
+      }
+      if (e.key === STORAGE.reservations) {
+        setReservations(getStoredReservations());
       }
     };
-
-    const handleReservationUpdate = (e: CustomEvent) => {
-      setReservations(e.detail.reservations);
-      setTables(e.detail.tables);
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('reservationUpdated', handleReservationUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('reservationUpdated', handleReservationUpdate as EventListener);
-    };
-  }, [loadTablesAndReservations]);
-
-  // Obtener mesas disponibles para una zona específica y número de huéspedes
-  const getAvailableTablesForZone = useCallback((zone: string, guestCount: number, selectedDate: string, selectedTime: string): Table[] => {
-    const location = ZONE_TO_LOCATION_MAP[zone];
-    if (!location) return [];
-
-    return tables.filter(table => {
-      // Filtrar por ubicación
-      if (table.location !== location) return false;
-      
-      // Filtrar por capacidad
-      if (table.capacity < guestCount) return false;
-      
-      // Verificar disponibilidad para la fecha y hora específica
-      return isTableAvailableForDateTime(table.id, selectedDate, selectedTime);
-    });
-  }, [tables]);
-
-  // Verificar si una mesa está disponible para una fecha y hora específica
-  const isTableAvailableForDateTime = useCallback((tableId: number, date: string, time: string): boolean => {
-    const tableReservations = reservations.filter(res => res.tableId === tableId);
-    
-    return !tableReservations.some(res => {
-      if (res.date !== date) return false;
-      
-      // Verificar conflicto de horarios (asumiendo 2 horas por reserva)
-      const resTime = res.time;
-      const resDateTime = new Date(`${date}T${resTime}`);
-      const newDateTime = new Date(`${date}T${time}`);
-      
-      const timeDiff = Math.abs(newDateTime.getTime() - resDateTime.getTime()) / (1000 * 60); // en minutos
-      
-      // Si hay menos de 2 horas de diferencia, hay conflicto
-      return timeDiff < 120;
-    });
-  }, [reservations]);
-
-  // Convertir ID de mesa del wizard a ID real
-  const getTableIdFromWizardId = useCallback((wizardTableId: string): number | null => {
-    return WIZARD_TABLE_TO_REAL_TABLE[wizardTableId] || null;
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  // Agregar nueva reserva y actualizar estado de mesas
-  const addReservation = useCallback((reservationData: any) => {
-    // Si viene directamente con tableId (desde página de Reservations)
-    let tableId = reservationData.tableId;
-    
-    // Si viene con table (ID del wizard), convertir
-    if (!tableId && reservationData.table) {
-      tableId = getTableIdFromWizardId(reservationData.table);
-    }
-    
-    if (!tableId) {
-      console.error('No se pudo encontrar la mesa:', reservationData.table || reservationData.tableId);
-      return false;
-    }
+  const isTableAvailableForDateTime = useCallback(
+    (tableId: number, date: string, time: string): boolean => {
+      const tableReservations = reservations.filter((r) => r.tableId === tableId);
+      return !tableReservations.some((r) => {
+        if (r.date !== date) return false;
+        const resDateTime = new Date(`${date}T${r.time}`);
+        const requested = new Date(`${date}T${time}`);
+        return minutesBetween(resDateTime, requested) < 120; // conflict if under 2 hours
+      });
+    },
+    [reservations]
+  );
 
-    const table = tables.find(t => t.id === tableId);
-    if (!table) {
-      console.error('Mesa no encontrada:', tableId);
-      return false;
-    }
+  const getAvailableTablesForZone = useCallback(
+    (zone: string, guestCount: number, selectedDate: string, selectedTime: string): Table[] => {
+      const location = ZONE_TO_LOCATION_MAP[zone];
+      if (!location) return [];
+      return tables.filter((table) => {
+        if (table.location !== location) return false;
+        if (table.capacity < guestCount) return false;
+        if (selectedDate && selectedTime) {
+          return isTableAvailableForDateTime(table.id, selectedDate, selectedTime);
+        }
+        return table.status === 'available';
+      });
+    },
+    [tables, isTableAvailableForDateTime]
+  );
 
-    const newReservation: Reservation = {
-      id: Date.now(),
-      tableId: tableId,
-      tableNumber: table.number,
-      customerName: reservationData.customerName,
-      customerEmail: reservationData.customerEmail,
-      customerPhone: reservationData.customerPhone,
-      date: reservationData.date,
-      time: reservationData.time,
-      guests: reservationData.guests || (reservationData.adults + reservationData.children + reservationData.babies),
-      adults: reservationData.adults,
-      children: reservationData.children,
-      babies: reservationData.babies,
-      zone: reservationData.zone,
-      table: reservationData.table,
-      consumptionType: reservationData.consumptionType,
-      specialRequests: reservationData.specialRequests
-    };
+  const getAvailableTablesForDateTime = useCallback(
+    (date: string, time: string, guestCount: number): Table[] => {
+      return tables.filter((table) => {
+        if (table.capacity < guestCount) return false;
+        return isTableAvailableForDateTime(table.id, date, time);
+      });
+    },
+    [tables, isTableAvailableForDateTime]
+  );
 
-    const updatedReservations = [...reservations, newReservation];
-    setReservations(updatedReservations);
-    
-    // Actualizar estado de mesas
-    const updatedTables = updateTablesStatus(INITIAL_TABLES, updatedReservations);
-    setTables(updatedTables);
-    
-    // Guardar en localStorage
-    localStorage.setItem('reservations', JSON.stringify(updatedReservations));
-    localStorage.setItem('tables', JSON.stringify(updatedTables));
-    
-    // Disparar evento personalizado para notificar a otras páginas
-    window.dispatchEvent(new CustomEvent('reservationUpdated', { 
-      detail: { reservations: updatedReservations, tables: updatedTables } 
-    }));
-    
-    return true;
-  }, [tables, reservations, updateTablesStatus, getTableIdFromWizardId]);
+  const getTableIdFromWizardId = useCallback((wizardTableId: string): number | null => {
+    return WIZARD_TABLE_TO_REAL_TABLE[wizardTableId] ?? null;
+  }, []);
 
-  // Eliminar reserva y actualizar estado de mesas
-  const removeReservation = useCallback((reservationId: number) => {
-    const updatedReservations = reservations.filter(res => res.id !== reservationId);
-    setReservations(updatedReservations);
-    
-    // Actualizar estado de mesas
-    const updatedTables = updateTablesStatus(INITIAL_TABLES, updatedReservations);
-    setTables(updatedTables);
-    
-    // Guardar en localStorage
-    localStorage.setItem('reservations', JSON.stringify(updatedReservations));
-    localStorage.setItem('tables', JSON.stringify(updatedTables));
-  }, [reservations, updateTablesStatus]);
+  const getWizardIdFromTableId = useCallback((tableId: number): string | null => {
+    return REAL_TO_WIZARD_TABLE[tableId] ?? null;
+  }, []);
 
-  // Refrescar datos (útil para actualizaciones periódicas)
+  const addReservation = useCallback(
+    (reservationData: any) => {
+      let tableId: number | null = reservationData.tableId ?? null;
+      if (!tableId && reservationData.table) {
+        tableId = getTableIdFromWizardId(String(reservationData.table));
+      }
+      if (!tableId) {
+        console.error('No se pudo encontrar la mesa:', reservationData.table || reservationData.tableId);
+        return false;
+      }
+
+      const table = tables.find((t) => t.id === tableId);
+      if (!table) {
+        console.error('Mesa no encontrada:', tableId);
+        return false;
+      }
+
+      const totalGuests =
+        reservationData.guests ??
+        (Number(reservationData.adults || 0) + Number(reservationData.children || 0) + Number(reservationData.babies || 0));
+
+      const newReservation: Reservation = {
+        id: Date.now(),
+        tableId,
+        tableNumber: table.number,
+        customerName: String(reservationData.customerName || ''),
+        customerEmail: String(reservationData.customerEmail || ''),
+        customerPhone: String(reservationData.customerPhone || ''),
+        date: String(reservationData.date || ''),
+        time: String(reservationData.time || ''),
+        guests: totalGuests,
+        adults: Number(reservationData.adults || 0),
+        children: Number(reservationData.children || 0),
+        babies: Number(reservationData.babies || 0),
+        status: 'confirmed',
+        zone: reservationData.zone,
+        table: reservationData.table,
+        consumptionType: reservationData.consumptionType,
+        specialRequests: reservationData.specialRequests,
+      };
+
+      const updatedReservations = [...reservations, newReservation];
+      setReservations(updatedReservations);
+
+      const updatedTables = updateTablesStatus(INITIAL_TABLES, updatedReservations);
+      setTables(updatedTables);
+
+      localStorage.setItem(STORAGE.reservations, JSON.stringify(updatedReservations));
+      localStorage.setItem(STORAGE.tables, JSON.stringify(updatedTables));
+
+      window.dispatchEvent(
+        new CustomEvent('reservationUpdated', {
+          detail: { reservations: updatedReservations, tables: updatedTables },
+        })
+      );
+
+      return true;
+    },
+    [tables, reservations, updateTablesStatus, getTableIdFromWizardId]
+  );
+
+  const removeReservation = useCallback(
+    (reservationId: number) => {
+      const updatedReservations = reservations.filter((r) => r.id !== reservationId);
+      setReservations(updatedReservations);
+
+      const updatedTables = updateTablesStatus(INITIAL_TABLES, updatedReservations);
+      setTables(updatedTables);
+
+      localStorage.setItem(STORAGE.reservations, JSON.stringify(updatedReservations));
+      localStorage.setItem(STORAGE.tables, JSON.stringify(updatedTables));
+    },
+    [reservations, updateTablesStatus]
+  );
+
   const refreshData = useCallback(() => {
     loadTablesAndReservations();
   }, [loadTablesAndReservations]);
@@ -284,16 +290,12 @@ export function useTablesManager() {
     tables,
     reservations,
     getAvailableTablesForZone,
-    getAvailableTablesForDateTime: (date: string, time: string, guestCount: number) => {
-      return tables.filter(table => {
-        if (table.capacity < guestCount) return false;
-        return isTableAvailableForDateTime(table.id, date, time);
-      });
-    },
+    getAvailableTablesForDateTime,
     isTableAvailableForDateTime,
     getTableIdFromWizardId,
+    getWizardIdFromTableId,
     addReservation,
     removeReservation,
-    refreshReservations: refreshData
+    refreshReservations: refreshData,
   };
 }
